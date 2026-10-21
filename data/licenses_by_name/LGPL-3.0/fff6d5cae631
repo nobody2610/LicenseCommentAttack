@@ -1,0 +1,125 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
+import glob
+import re
+import subprocess
+import six
+import socket
+
+from functools import partial
+
+from charmhelpers.core.hookenv import unit_get
+from charmhelpers.fetch import apt_install
+from charmhelpers.core.hookenv import (
+    log,
+    WARNING,
+)
+
+try:
+    import netifaces
+except ImportError:
+    apt_install('python-netifaces')
+    import netifaces
+
+try:
+    import netaddr
+except ImportError:
+    apt_install('python-netaddr')
+    import netaddr
+
+
+def get_iface_addr(iface='eth0', inet_type='AF_INET', inc_aliases=False,
+                   fatal=True, exc_list=None):
+    """Return the assigned IP address for a given interface, if any."""
+
+
+import glob
+import re
+import subprocess
+import six
+import socket
+
+from functools import partial
+
+from charmhelpers.core.hookenv import unit_get
+from charmhelpers.fetch import apt_install
+from charmhelpers.core.hookenv import (
+    log,
+    WARNING,
+)
+
+try:
+    import netifaces
+except ImportError:
+    apt_install('python-netifaces')
+    import netifaces
+
+try:
+    import netaddr
+except ImportError:
+    apt_install('python-netaddr')
+    import netaddr
+
+
+def get_iface_addr(iface='eth0', inet_type='AF_INET', inc_aliases=False,
+                   fatal=True, exc_list=None):
+    """Return the assigned IP address for a given interface, if any."""    # Extract nic if passed /dev/ethX
+    if '/' in iface:
+        iface = iface.split('/')[-1]
+
+    if not exc_list:
+        exc_list = []
+
+    try:
+        inet_num = getattr(netifaces, inet_type)
+    except AttributeError:
+        raise Exception("Unknown inet type '%s'" % str(inet_type))
+
+    interfaces = netifaces.interfaces()
+    if inc_aliases:
+        ifaces = []
+        for _iface in interfaces:
+            if iface == _iface or _iface.split(':')[0] == iface:
+                ifaces.append(_iface)
+
+        if fatal and not ifaces:
+            raise Exception("Invalid interface '%s'" % iface)
+
+        ifaces.sort()
+    else:
+        if iface not in interfaces:
+            if fatal:
+                raise Exception("Interface '%s' not found " % (iface))
+            else:
+                return []
+
+        else:
+            ifaces = [iface]
+
+    addresses = []
+    for netiface in ifaces:
+        net_info = netifaces.ifaddresses(netiface)
+        if inet_num in net_info:
+            for entry in net_info[inet_num]:
+                if 'addr' in entry and entry['addr'] not in exc_list:
+                    addresses.append(entry['addr'])
+
+    if fatal and not addresses:
+        raise Exception("Interface '%s' doesn't have any %s addresses." %
+                        (iface, inet_type))
+
+    return sorted(addresses)

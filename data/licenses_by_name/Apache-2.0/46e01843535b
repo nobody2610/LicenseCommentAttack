@@ -1,0 +1,178 @@
+#Copyright 2019 gRPC authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Generate draft and release notes in Markdown from Github PRs.
+
+You'll need a github API token to avoid being rate-limited. See
+https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+
+This script collects PRs using "git log X..Y" from local repo where X and Y are
+tags or release branch names of previous and current releases respectively.
+Typically, notes are generated before the release branch is labelled so Y is
+almost always the name of the release branch. X is the previous release branch
+if this is not a patch release. Otherwise, it is the previous release tag.
+For example, for release v1.17.0, X will be origin/v1.16.x and for release v1.17.3,
+X will be v1.17.2. In both cases Y will be origin/v1.17.x.
+
+"""
+
+from collections import defaultdict
+import base64
+import json
+
+content_header = """Draft Release Notes For {version}
+--
+Final release notes will be generated from the PR titles that have *"release notes:yes"* label. If you have any additional notes please add them below. These will be appended to auto generated release notes. Previous releases notes are [here](https://github.com/grpc/grpc/releases).
+
+**Also, look at the PRs listed below against your name.** Please apply the missing labels and make necessary corrections (like fixing the title) to the PR in Github. Final release notes will be generated just before the release on {date}.
+
+Add additional notes not in PRs
+--
+
+Core
+-
+
+
+C++
+-
+
+
+C#
+-
+
+
+Objective-C
+-
+
+
+PHP
+-
+
+
+Python
+-
+
+
+Ruby
+-
+
+
+"""
+
+rl_header = """This is the {version} release ([{name}](https://github.com/grpc/grpc/blob/master/doc/g_stands_for.md)) of gRPC Core.
+
+Please see the notes for the previous releases here: https://github.com/grpc/grpc/releases. Please consult https://grpc.io/ for all information regarding this product.
+
+This release contains refinements, improvements, and bug fixes, with highlights listed below.
+
+
+"""
+
+HTML_URL = "https://github.com/grpc/grpc/pull/"
+API_URL = 'https://api.github.com/repos/grpc/grpc/pulls/'
+
+
+def get_pr_data(pr_num):
+    """Get the PR data from github. Return 'error' on exception"""
+
+"""Generate draft and release notes in Markdown from Github PRs.
+
+You'll need a github API token to avoid being rate-limited. See
+https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+
+This script collects PRs using "git log X..Y" from local repo where X and Y are
+tags or release branch names of previous and current releases respectively.
+Typically, notes are generated before the release branch is labelled so Y is
+almost always the name of the release branch. X is the previous release branch
+if this is not a patch release. Otherwise, it is the previous release tag.
+For example, for release v1.17.0, X will be origin/v1.16.x and for release v1.17.3,
+X will be v1.17.2. In both cases Y will be origin/v1.17.x.
+
+"""
+
+from collections import defaultdict
+import base64
+import json
+
+content_header = """Draft Release Notes For {version}
+--
+Final release notes will be generated from the PR titles that have *"release notes:yes"* label. If you have any additional notes please add them below. These will be appended to auto generated release notes. Previous releases notes are [here](https://github.com/grpc/grpc/releases).
+
+**Also, look at the PRs listed below against your name.** Please apply the missing labels and make necessary corrections (like fixing the title) to the PR in Github. Final release notes will be generated just before the release on {date}.
+
+Add additional notes not in PRs
+--
+
+Core
+-
+
+
+C++
+-
+
+
+C#
+-
+
+
+Objective-C
+-
+
+
+PHP
+-
+
+
+Python
+-
+
+
+Ruby
+-
+
+
+"""
+
+rl_header = """This is the {version} release ([{name}](https://github.com/grpc/grpc/blob/master/doc/g_stands_for.md)) of gRPC Core.
+
+Please see the notes for the previous releases here: https://github.com/grpc/grpc/releases. Please consult https://grpc.io/ for all information regarding this product.
+
+This release contains refinements, improvements, and bug fixes, with highlights listed below.
+
+
+"""
+
+HTML_URL = "https://github.com/grpc/grpc/pull/"
+API_URL = 'https://api.github.com/repos/grpc/grpc/pulls/'
+
+
+def get_pr_data(pr_num):
+    """Get the PR data from github. Return 'error' on exception"""
+    try:
+        from urllib2 import Request, urlopen, HTTPError
+    except ImportError:
+        import urllib
+        from urllib.request import Request, urlopen, HTTPError
+    url = API_URL + pr_num
+    req = Request(url)
+    req.add_header('Authorization', 'token %s' % TOKEN)
+    try:
+        f = urlopen(req)
+        response = json.loads(f.read().decode('utf-8'))
+        #print(response)
+    except HTTPError as e:
+        response = json.loads(e.fp.read().decode('utf-8'))
+        if 'message' in response:
+            print(response['message'])
+        response = "error"
+    return response

@@ -1,0 +1,163 @@
+###############################################################################
+#
+# The MIT License (MIT)
+#
+# Copyright (c) Tavendo GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", fWITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+###############################################################################
+
+from __future__ import absolute_import
+
+import os
+import time
+import struct
+import sys
+import re
+import base64
+import math
+import random
+import binascii
+from datetime import datetime, timedelta
+from pprint import pformat
+from array import array
+
+import six
+
+import txaio
+
+
+__all__ = ("xor",
+           "utcnow",
+           "utcstr",
+           "id",
+           "rid",
+           "newid",
+           "rtime",
+           "Stopwatch",
+           "Tracker",
+           "EqualityMixin",
+           "ObservableMixin",
+           "IdGenerator",
+           "generate_token",
+           "generate_activation_code",
+           "generate_serial_number",
+           "generate_user_password")
+
+
+def encode_truncate(text, limit, encoding='utf8', return_encoded=True):
+    """
+    Given a string, return a truncated version of the string such that
+    the UTF8 encoding of the string is smaller than the given limit.
+
+    This function correctly truncates even in the presence of Unicode code
+    points that encode to multi-byte encodings which must not be truncated
+    in the middle.
+
+    :param text: The Unicode string to truncate.
+    :type text: unicode
+    :param limit: The number of bytes to limit the UTF8 encoding to.
+    :type limit: int
+
+    :returns: The truncated Unicode string.
+    :rtype: unicode
+    """
+
+
+from __future__ import absolute_import
+
+import os
+import time
+import struct
+import sys
+import re
+import base64
+import math
+import random
+import binascii
+from datetime import datetime, timedelta
+from pprint import pformat
+from array import array
+
+import six
+
+import txaio
+
+
+__all__ = ("xor",
+           "utcnow",
+           "utcstr",
+           "id",
+           "rid",
+           "newid",
+           "rtime",
+           "Stopwatch",
+           "Tracker",
+           "EqualityMixin",
+           "ObservableMixin",
+           "IdGenerator",
+           "generate_token",
+           "generate_activation_code",
+           "generate_serial_number",
+           "generate_user_password")
+
+
+def encode_truncate(text, limit, encoding='utf8', return_encoded=True):
+    """
+    Given a string, return a truncated version of the string such that
+    the UTF8 encoding of the string is smaller than the given limit.
+
+    This function correctly truncates even in the presence of Unicode code
+    points that encode to multi-byte encodings which must not be truncated
+    in the middle.
+
+    :param text: The Unicode string to truncate.
+    :type text: unicode
+    :param limit: The number of bytes to limit the UTF8 encoding to.
+    :type limit: int
+
+    :returns: The truncated Unicode string.
+    :rtype: unicode
+    """    assert(text is None or type(text) == six.text_type)
+    assert(type(limit) in six.integer_types)
+    assert(limit >= 0)
+
+    if text is None:
+        return
+
+    # encode the given string in the specified encoding
+    s = text.encode(encoding)
+
+    # when the resulting byte string is longer than the given limit ..
+    if len(s) > limit:
+        # .. truncate, and
+        s = s[:limit]
+
+        # decode back, ignoring errors that result from truncation
+        # in the middle of multi-byte encodings
+        text = s.decode(encoding, 'ignore')
+
+        if return_encoded:
+            s = text.encode(encoding)
+
+    if return_encoded:
+        return s
+    else:
+        return text

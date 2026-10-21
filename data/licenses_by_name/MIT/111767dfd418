@@ -1,0 +1,147 @@
+###############################################################################
+#
+# The MIT License (MIT)
+#
+# Copyright (c) Tavendo GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+###############################################################################
+
+
+from __future__ import absolute_import, print_function
+
+import itertools
+from functools import partial
+
+from twisted.internet.defer import inlineCallbacks
+from twisted.internet.interfaces import IStreamClientEndpoint
+from twisted.internet.endpoints import UNIXClientEndpoint
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.internet.error import ReactorNotRunning
+from twisted.internet.task import react
+
+try:
+    _TLS = True
+    from twisted.internet.endpoints import SSL4ClientEndpoint
+    from twisted.internet.ssl import optionsForClientTLS, CertificateOptions
+    from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
+    from OpenSSL import SSL
+except ImportError as e:
+    _TLS = False
+    if 'OpenSSL' not in str(e):
+        raise
+
+import txaio
+
+from autobahn.twisted.websocket import WampWebSocketClientFactory
+from autobahn.twisted.rawsocket import WampRawSocketClientFactory
+
+from autobahn.wamp import component
+
+from autobahn.twisted.util import sleep
+from autobahn.twisted.wamp import ApplicationSession
+from autobahn.wamp.exception import ApplicationError
+
+
+__all__ = ('Component')
+
+
+def _create_transport_serializers(transport_config):
+    """
+    Create a list of serializers to use with a WAMP protocol factory.
+    """
+
+
+
+from __future__ import absolute_import, print_function
+
+import itertools
+from functools import partial
+
+from twisted.internet.defer import inlineCallbacks
+from twisted.internet.interfaces import IStreamClientEndpoint
+from twisted.internet.endpoints import UNIXClientEndpoint
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.internet.error import ReactorNotRunning
+from twisted.internet.task import react
+
+try:
+    _TLS = True
+    from twisted.internet.endpoints import SSL4ClientEndpoint
+    from twisted.internet.ssl import optionsForClientTLS, CertificateOptions
+    from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
+    from OpenSSL import SSL
+except ImportError as e:
+    _TLS = False
+    if 'OpenSSL' not in str(e):
+        raise
+
+import txaio
+
+from autobahn.twisted.websocket import WampWebSocketClientFactory
+from autobahn.twisted.rawsocket import WampRawSocketClientFactory
+
+from autobahn.wamp import component
+
+from autobahn.twisted.util import sleep
+from autobahn.twisted.wamp import ApplicationSession
+from autobahn.wamp.exception import ApplicationError
+
+
+__all__ = ('Component')
+
+
+def _create_transport_serializers(transport_config):
+    """
+    Create a list of serializers to use with a WAMP protocol factory.
+    """    if u'serializers' in transport_config:
+        serializer_ids = _unique_list(transport_config[u'serializers'])
+    else:
+        serializer_ids = [u'msgpack', u'json']
+
+    serializers = []
+
+    for serializer_id in serializer_ids:
+        if serializer_id == u'msgpack':
+            # try MsgPack WAMP serializer
+            try:
+                from autobahn.wamp.serializer import MsgPackSerializer
+            except ImportError:
+                pass
+            else:
+                serializers.append(MsgPackSerializer(batched=True))
+                serializers.append(MsgPackSerializer())
+
+        elif serializer_id == u'json':
+            # try JSON WAMP serializer
+            try:
+                from autobahn.wamp.serializer import JsonSerializer
+            except ImportError:
+                pass
+            else:
+                serializers.append(JsonSerializer(batched=True))
+                serializers.append(JsonSerializer())
+
+        else:
+            raise RuntimeError(
+                "Unknown serializer '{}'".format(serializer_id)
+            )
+
+    return serializers

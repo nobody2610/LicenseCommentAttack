@@ -1,0 +1,54 @@
+attack:
+  comment_style: line
+  target: license
+model:
+  device: auto
+  dtype: bfloat16
+  kind: hf
+  name: deepseek-coder-33b-instruct
+  trust_remote_code: false
+seed: 0
+task:
+  dataset: real
+  dataset_dir: data/licenses_by_name
+  eval_licenses:
+  - GPL-2.0
+  - GPL-2.0-classpath
+  - GPL-3.0
+  - AGPL-3.0
+  - LGPL-2.1
+  - LGPL-3.0
+  - MPL-2.0
+  - EPL-2.0
+  - CDDL-1.0
+  - SSPL-1.0
+  - OSL-3.0
+  - Artistic-2.0
+  - MIT
+  - ISC
+  - Apache-2.0
+  - BSD-3-Clause
+  - BSL-1.1
+  - Zlib
+  labels:
+  - GPL-2.0
+  - GPL-2.0-classpath
+  - GPL-3.0
+  - AGPL-3.0
+  - LGPL-2.1
+  - LGPL-3.0
+  - MPL-2.0
+  - EPL-2.0
+  - CDDL-1.0
+  - SSPL-1.0
+  - OSL-3.0
+  - Artistic-2.0
+  - MIT
+  - ISC
+  - Apache-2.0
+  - BSD-3-Clause
+  - BSL-1.1
+  - Zlib
+  - NOASSERTION
+  prompt_style: open_ended
+  templates_path: data/comment_templates.json

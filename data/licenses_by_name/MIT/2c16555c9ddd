@@ -1,0 +1,74 @@
+# -*- coding: utf-8 -*-
+# Portions of the code within this module are taken from https://github.com/jaraco/jaraco.windows
+#   which is MIT licensed by Jason R. Coombs.
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from logging import getLogger
+from os import chmod as os_chmod, lstat
+from os.path import abspath, isdir, islink as os_islink
+
+from ...common.compat import PY2, on_win
+from ...exceptions import CondaOSError
+
+__all__ = ('islink', 'lchmod', 'link', 'readlink', 'stat_nlink', 'symlink')
+
+log = getLogger(__name__)
+
+
+if PY2:  # pragma: py3 no cover
+    def find_files(spec):
+        """
+        A pythonic wrapper around the FindFirstFile/FindNextFile win32 api.
+        >>> root_files = tuple(find_files(r'c:\*'))
+        >>> len(root_files) > 1
+        True
+        >>> root_files[0].filename == root_files[1].filename
+        False
+        >>> # This test might fail on a non-standard installation
+        >>> 'Windows' in (fd.filename for fd in root_files)
+        True
+        """
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+from logging import getLogger
+from os import chmod as os_chmod, lstat
+from os.path import abspath, isdir, islink as os_islink
+
+from ...common.compat import PY2, on_win
+from ...exceptions import CondaOSError
+
+__all__ = ('islink', 'lchmod', 'link', 'readlink', 'stat_nlink', 'symlink')
+
+log = getLogger(__name__)
+
+
+if PY2:  # pragma: py3 no cover
+    def find_files(spec):
+        """
+        A pythonic wrapper around the FindFirstFile/FindNextFile win32 api.
+        >>> root_files = tuple(find_files(r'c:\*'))
+        >>> len(root_files) > 1
+        True
+        >>> root_files[0].filename == root_files[1].filename
+        False
+        >>> # This test might fail on a non-standard installation
+        >>> 'Windows' in (fd.filename for fd in root_files)
+        True
+        """        fd = WIN32_FIND_DATA()
+        handle = FindFirstFile(spec, byref(fd))
+        while True:
+            if handle == INVALID_HANDLE_VALUE:
+                raise WindowsError()
+            yield fd
+            fd = WIN32_FIND_DATA()
+            res = FindNextFile(handle, byref(fd))
+            if res == 0:  # error
+                error = WindowsError()
+                if error.code == ERROR_NO_MORE_FILES:
+                    break
+                else:
+                    raise error
+        # todo: how to close handle when generator is destroyed?
+        # hint: catch GeneratorExit
+        windll.kernel32.FindClose(handle)

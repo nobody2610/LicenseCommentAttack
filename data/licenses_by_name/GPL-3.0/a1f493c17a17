@@ -1,0 +1,111 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (c) 2012, Michael DeHaan <michael.dehaan@gmail.com>, and others
+#
+# This file is part of Ansible
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
+import shlex
+import shutil
+import os
+import subprocess
+import sys
+import traceback
+import signal
+import time
+import syslog
+
+PY3 = sys.version_info[0] == 3
+
+syslog.openlog('ansible-%s' % os.path.basename(__file__))
+syslog.syslog(syslog.LOG_NOTICE, 'Invoked with %s' % " ".join(sys.argv[1:]))
+
+def _filter_non_json_lines(data):
+    '''
+    Used to filter unrelated output around module JSON output, like messages from
+    tcagetattr, or where dropbear spews MOTD on every single command (which is nuts).
+
+    Filters leading lines before first line-starting occurrence of '{' or '[', and filter all
+    trailing lines after matching close character (working from the bottom of output).
+    '''
+
+
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
+import shlex
+import shutil
+import os
+import subprocess
+import sys
+import traceback
+import signal
+import time
+import syslog
+
+PY3 = sys.version_info[0] == 3
+
+syslog.openlog('ansible-%s' % os.path.basename(__file__))
+syslog.syslog(syslog.LOG_NOTICE, 'Invoked with %s' % " ".join(sys.argv[1:]))
+
+def _filter_non_json_lines(data):
+    '''
+    Used to filter unrelated output around module JSON output, like messages from
+    tcagetattr, or where dropbear spews MOTD on every single command (which is nuts).
+
+    Filters leading lines before first line-starting occurrence of '{' or '[', and filter all
+    trailing lines after matching close character (working from the bottom of output).
+    '''    warnings = []
+
+    # Filter initial junk
+    lines = data.splitlines()
+
+    for start, line in enumerate(lines):
+        line = line.strip()
+        if line.startswith(u'{'):
+            endchar = u'}'
+            break
+        elif line.startswith(u'['):
+            endchar = u']'
+            break
+    else:
+        raise ValueError('No start of json char found')
+
+    # Filter trailing junk
+    lines = lines[start:]
+
+    for reverse_end_offset, line in enumerate(reversed(lines)):
+        if line.strip().endswith(endchar):
+            break
+    else:
+        raise ValueError('No end of json char found')
+
+    if reverse_end_offset > 0:
+        # Trailing junk is uncommon and can point to things the user might
+        # want to change.  So print a warning if we find any
+        trailing_junk = lines[len(lines) - reverse_end_offset:]
+        warnings.append('Module invocation had junk after the JSON data: %s' % '\n'.join(trailing_junk))
+
+    lines = lines[:(len(lines) - reverse_end_offset)]
+
+    return ('\n'.join(lines), warnings)

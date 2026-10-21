@@ -1,0 +1,115 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright © Spyder Project Contributors
+# Licensed under the terms of the MIT License
+#
+
+"""
+Tests for findinfiles.py
+"""
+
+# Test library imports
+import os
+import pytest
+import os.path as osp
+
+# Third party imports
+from qtpy.QtCore import Qt
+
+# Local imports
+from spyder.widgets.findinfiles import (FindInFilesWidget, SearchInComboBox,
+                                        EXTERNAL_PATHS, SELECT_OTHER, CWD,
+                                        CLEAR_LIST, PROJECT, FILE_PATH,
+                                        QMessageBox)
+from spyder.py3compat import PY2
+
+LOCATION = osp.realpath(osp.join(os.getcwd(), osp.dirname(__file__)))
+NONASCII_DIR = osp.join(LOCATION, u"èáïü Øαôå 字分误")
+if not osp.exists(NONASCII_DIR):
+    os.makedirs(NONASCII_DIR)
+
+
+def test_add_external_paths(searchin_combobox, mocker):
+    """
+    Test that the external_path_history is added correctly to the
+    combobox and test that adding new external path to the combobox
+    with the QFileDialog is working as expected.
+    """
+
+
+"""
+Tests for findinfiles.py
+"""
+
+import os
+import pytest
+import os.path as osp
+
+from qtpy.QtCore import Qt
+
+from spyder.widgets.findinfiles import (FindInFilesWidget, SearchInComboBox,
+                                        EXTERNAL_PATHS, SELECT_OTHER, CWD,
+                                        CLEAR_LIST, PROJECT, FILE_PATH,
+                                        QMessageBox)
+from spyder.py3compat import PY2
+
+LOCATION = osp.realpath(osp.join(os.getcwd(), osp.dirname(__file__)))
+NONASCII_DIR = osp.join(LOCATION, u"èáïü Øαôå 字分误")
+if not osp.exists(NONASCII_DIR):
+    os.makedirs(NONASCII_DIR)
+
+
+def test_add_external_paths(searchin_combobox, mocker):
+    """
+    Test that the external_path_history is added correctly to the
+    combobox and test that adding new external path to the combobox
+    with the QFileDialog is working as expected.
+    """    searchin_combobox.show()
+
+    # Assert that the external_path_history was added correctly to the
+    # combobox
+    expected_results = [
+            LOCATION,
+            osp.dirname(osp.dirname(LOCATION)),
+            osp.dirname(osp.dirname(osp.dirname(LOCATION))),
+            osp.dirname(LOCATION)
+            ]
+    assert searchin_combobox.count() == len(expected_results)+EXTERNAL_PATHS
+    assert searchin_combobox.get_external_paths() == expected_results
+    for i, expected_result in enumerate(expected_results):
+        assert expected_result == searchin_combobox.itemText(i+EXTERNAL_PATHS)
+
+    # Add a new external path to the combobox. The new path is added at the
+    # end of the combobox.
+    new_path = NONASCII_DIR
+    mocker.patch('spyder.widgets.findinfiles.getexistingdirectory',
+                 return_value=new_path)
+    searchin_combobox.setCurrentIndex(SELECT_OTHER)
+
+    expected_results.append(new_path)
+    assert searchin_combobox.count() == len(expected_results)+EXTERNAL_PATHS
+    assert searchin_combobox.get_external_paths() == expected_results
+    assert searchin_combobox.currentIndex() == searchin_combobox.count()-1
+
+    # Add an external path that is already listed in the combobox. In this
+    # case, the new path is removed from the list and is added back at the end.
+    new_path = LOCATION
+    mocker.patch('spyder.widgets.findinfiles.getexistingdirectory',
+                 return_value=new_path)
+    searchin_combobox.setCurrentIndex(SELECT_OTHER)
+
+    expected_results.pop(0)
+    expected_results.append(new_path)
+    assert searchin_combobox.count() == len(expected_results)+EXTERNAL_PATHS
+    assert searchin_combobox.get_external_paths() == expected_results
+    assert searchin_combobox.currentIndex() == searchin_combobox.count()-1
+
+    # Cancel the action of adding a new external path. In this case, the
+    # expected results do not change.
+    mocker.patch('spyder.widgets.findinfiles.getexistingdirectory',
+                 return_value='')
+    searchin_combobox.setCurrentIndex(SELECT_OTHER)
+
+    assert searchin_combobox.count() == len(expected_results)+EXTERNAL_PATHS
+    assert searchin_combobox.get_external_paths() == expected_results
+    assert searchin_combobox.currentIndex() == CWD

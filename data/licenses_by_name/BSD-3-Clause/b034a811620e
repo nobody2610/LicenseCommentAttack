@@ -1,0 +1,77 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+
+"""
+Tests that relate to evaluating models with quantity parameters
+"""
+
+
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose
+
+
+from astropy.modeling.core import Model
+from astropy.modeling.models import Gaussian1D, Shift, Scale, Pix2Sky_TAN
+from astropy import units as u
+from astropy.units import UnitsError
+from astropy.tests.helper import assert_quantity_allclose
+
+
+# We start off by taking some simple cases where the units are defined by
+# whatever the model is initialized with, and we check that the model evaluation
+# returns quantities.
+
+
+def test_compound_input_units_strict():
+    """
+    Test setting input_units_strict on one of the models.
+    """
+
+
+"""
+Tests that relate to evaluating models with quantity parameters
+"""
+
+
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose
+
+
+from astropy.modeling.core import Model
+from astropy.modeling.models import Gaussian1D, Shift, Scale, Pix2Sky_TAN
+from astropy import units as u
+from astropy.units import UnitsError
+from astropy.tests.helper import assert_quantity_allclose
+
+
+
+
+def test_compound_input_units_strict():
+    """
+    Test setting input_units_strict on one of the models.
+    """
+    class ScaleDegrees(Scale):
+        input_units = {'x': u.deg}
+
+    s1 = ScaleDegrees(2)
+    s2 = Scale(2)
+
+    cs = s1 | s2
+
+    out = cs(10 * u.arcsec)
+    assert_quantity_allclose(out, 40 * u.arcsec)
+    assert out.unit is u.deg  # important since this tests input_units_strict
+
+    cs = s2 | s1
+
+    out = cs(10 * u.arcsec)
+    assert_quantity_allclose(out, 40 * u.arcsec)
+    assert out.unit is u.deg  # important since this tests input_units_strict
+
+    cs = s1 & s2
+
+    out = cs(10 * u.arcsec, 10 * u.arcsec)
+    assert_quantity_allclose(out, 20 * u.arcsec)
+    assert out[0].unit is u.deg
+    assert out[1].unit is u.arcsec

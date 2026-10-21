@@ -1,0 +1,102 @@
+#! /usr/bin/env python
+
+# Copyright (C) 2011-2014 Free Software Foundation, Inc.
+#
+# This file is part of GDB.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# This program requires readelf, gdb and objcopy.  The default values are gdb
+# from the build tree and objcopy and readelf from $PATH.  They may be
+# overridden by setting environment variables GDB, READELF and OBJCOPY
+# respectively.  We assume the current directory is either $obj/gdb or
+# $obj/gdb/testsuite.
+#
+# Example usage:
+#
+# bash$ cd $objdir/gdb/testsuite
+# bash$ python test_pubnames_and_indexes.py <binary_name>
+
+"""test_pubnames_and_indexes.py
+
+Test that the gdb_index produced by gold is identical to the gdb_index
+produced by gdb itself.
+
+Further check that the pubnames and pubtypes produced by gcc are identical
+to those that gdb produces.
+
+Finally, check that all strings are canonicalized identically.
+"""
+
+__author__ = 'saugustine@google.com (Sterling Augustine)'
+
+import os
+import subprocess
+import sys
+
+OBJCOPY = None
+READELF = None
+GDB = None
+
+
+def get_pub_info(filename, readelf_option):
+  """Parse and return all the pubnames or pubtypes produced by readelf with the
+  given option.
+  """
+
+
+
+
+"""test_pubnames_and_indexes.py
+
+Test that the gdb_index produced by gold is identical to the gdb_index
+produced by gdb itself.
+
+Further check that the pubnames and pubtypes produced by gcc are identical
+to those that gdb produces.
+
+Finally, check that all strings are canonicalized identically.
+"""
+
+import os
+import subprocess
+import sys
+
+OBJCOPY = None
+READELF = None
+GDB = None
+
+
+def get_pub_info(filename, readelf_option):
+  """Parse and return all the pubnames or pubtypes produced by readelf with the
+  given option.
+  """
+  readelf = subprocess.Popen([READELF, '--debug-dump=' + readelf_option,
+                                       filename], stdout=subprocess.PIPE)
+  pubnames = []
+
+  in_list = False;
+  for line in readelf.stdout:
+    fields = line.split(None, 1)
+    if (len(fields) == 2 and fields[0] == 'Offset'
+        and fields[1].strip() == 'Name'):
+      in_list = True
+    # Either a blank-line or a new Length field terminates the current section.
+    elif (len(fields) == 0 or fields[0] == 'Length:'):
+      in_list = False;
+    elif (in_list):
+      pubnames.append(fields[1].strip())
+
+  readelf.wait()
+  return pubnames

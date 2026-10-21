@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+# Copyright (c) 2011 Qtrac Ltd. All rights reserved.
+# This program or module is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version. It is provided for educational
+# purposes and is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+
+"""
+BNF
+
+    M3U         ::= '#EXTM3U' ENTRY+
+    ENTRY       ::= INFO FILENAME
+    INFO        ::= '#EXTINF:' SECONDS ',' TITLE
+    SECONDS     ::= -?\d+
+    TITLE       ::= .+
+    FILENAME    ::= .+
+"""
+
+import collections
+import re
+import ply.lex
+try:
+    from pyparsing import (Combine, LineEnd, nums, OneOrMore,
+            Optional, ParseException, restOfLine, Suppress, Word)
+except ImportError:
+    from pyparsing_py3 import (Combine, LineEnd, nums, OneOrMore,
+            Optional, ParseException, restOfLine, Suppress, Word)
+
+
+Song = collections.namedtuple("Song", "title seconds filename")
+
+
+def songs_regex(fh):
+    r"""
+    >>> import os
+    >>> filename = os.path.dirname(__file__)
+    >>> filename = os.path.join(filename, "data/Various-Pop.m3u")
+    >>> with open(filename, "rt", encoding="utf8") as fh:
+    ...     songs = songs_regex(fh)
+    >>> songs[0].title, songs[0].seconds, songs[0].filename
+    ('Various - Two Tribes', 236, 'Various\\Frankie Goes To Hollywood\\02-Two Tribes.ogg')
+    >>> songs[-1].title, songs[-1].seconds, songs[-1].filename
+    ('The Police - Walking On The Moon', 303, 'Various\\Sting & The Police 1997\\06-Walking On The Moon.ogg')
+    >>> lines = []
+    >>> lines.append("#EXTM3U")
+    >>> lines.append("#EXTINF:140,The Beatles - Love Me Do")
+    >>> lines.append("Beatles\\Greatest Hits\\01-Love Me Do.ogg")
+    >>> lines.append("#EXTINF:-1,The Beatles - From Me To You")
+    >>> lines.append("Beatles\\Greatest Hits\\02-From Me To You.ogg")
+    >>> import io
+    >>> data = io.StringIO("\n".join(lines))
+    >>> songs = songs_ply(data)
+    >>> len(songs) == 2
+    True
+    >>> songs[0].title, songs[0].seconds
+    ('The Beatles - Love Me Do', 140)
+    >>> songs[1].title, songs[1].seconds
+    ('The Beatles - From Me To You', -1)
+    """
+
+
+"""
+BNF
+
+    M3U         ::= '#EXTM3U' ENTRY+
+    ENTRY       ::= INFO FILENAME
+    INFO        ::= '#EXTINF:' SECONDS ',' TITLE
+    SECONDS     ::= -?\d+
+    TITLE       ::= .+
+    FILENAME    ::= .+
+"""
+
+import collections
+import re
+import ply.lex
+try:
+    from pyparsing import (Combine, LineEnd, nums, OneOrMore,
+            Optional, ParseException, restOfLine, Suppress, Word)
+except ImportError:
+    from pyparsing_py3 import (Combine, LineEnd, nums, OneOrMore,
+            Optional, ParseException, restOfLine, Suppress, Word)
+
+
+Song = collections.namedtuple("Song", "title seconds filename")
+
+
+def songs_regex(fh):
+    r"""
+    >>> import os
+    >>> filename = os.path.dirname(__file__)
+    >>> filename = os.path.join(filename, "data/Various-Pop.m3u")
+    >>> with open(filename, "rt", encoding="utf8") as fh:
+    ...     songs = songs_regex(fh)
+    >>> songs[0].title, songs[0].seconds, songs[0].filename
+    ('Various - Two Tribes', 236, 'Various\\Frankie Goes To Hollywood\\02-Two Tribes.ogg')
+    >>> songs[-1].title, songs[-1].seconds, songs[-1].filename
+    ('The Police - Walking On The Moon', 303, 'Various\\Sting & The Police 1997\\06-Walking On The Moon.ogg')
+    >>> lines = []
+    >>> lines.append("#EXTM3U")
+    >>> lines.append("#EXTINF:140,The Beatles - Love Me Do")
+    >>> lines.append("Beatles\\Greatest Hits\\01-Love Me Do.ogg")
+    >>> lines.append("#EXTINF:-1,The Beatles - From Me To You")
+    >>> lines.append("Beatles\\Greatest Hits\\02-From Me To You.ogg")
+    >>> import io
+    >>> data = io.StringIO("\n".join(lines))
+    >>> songs = songs_ply(data)
+    >>> len(songs) == 2
+    True
+    >>> songs[0].title, songs[0].seconds
+    ('The Beatles - Love Me Do', 140)
+    >>> songs[1].title, songs[1].seconds
+    ('The Beatles - From Me To You', -1)
+    """    if fh.readline() != "#EXTM3U\n":
+        print("This is not a .m3u file")
+        return []
+    songs = []
+    INFO_RE = re.compile(r"#EXTINF:(?P<seconds>-?\d+),(?P<title>.+)")
+    title = seconds = None
+    WANT_INFO, WANT_FILENAME = range(2)
+    state = WANT_INFO
+    for lino, line in enumerate(fh, start=2):
+        line = line.strip()
+        if not line:
+            continue
+        if state == WANT_INFO:
+            info = INFO_RE.match(line)
+            if info:
+                title = info.group("title")
+                seconds = int(info.group("seconds"))
+                state = WANT_FILENAME
+            else:
+                print("Failed to parse line {0}: {1}".format(
+                      lino, line))
+        elif state == WANT_FILENAME:
+            songs.append(Song(title, seconds, line))
+            title = seconds = None
+            state = WANT_INFO
+    return songs

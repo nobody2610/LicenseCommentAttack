@@ -1,0 +1,173 @@
+#!/usr/bin/env python
+# coding: utf-8
+# Copyright 2015 Moses Palmér
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <http://www.gnu.org/licenses/>.
+"""
+Converts <keysymdef.h> to Python mappings.
+"""
+
+import datetime
+import re
+import sys
+import unicodedata
+
+
+#: The regular expresion used to extract normal values; they are on the form:
+#:
+#:     #define XK_<name> <hex keysym> /* <unicode point> <character name> */
+KEYSYM_RE = re.compile(r'''(?mx)
+    # name
+    \#define \s+ XK_([a-zA-Z0-9_]+)\s+
+
+    # keysym
+    0x([0-9a-fA-F]+)\s+
+
+    # codepoint
+    /\*\s* U\+([0-9a-fA-F]+)\s+.*?\*/
+
+    # description, not present
+    ()''')
+
+#: The prefix used for dead keys
+DEAD_PREFIX = 'dead_'
+
+#: The regular expresion used to extract dead key values; they are on the form:
+#:
+#:     #define XK_dead_<name> <hex keysym> [/* description */]
+DEAD_KEYSYM_RE = re.compile(r'''(?mx)
+    # name
+    \#define \s+ XK_(%s[a-zA-Z0-9_]+)\s+
+
+    # keysym
+    0x([0-9a-fA-F]+)\s*
+
+    # codepoint, not present
+    ()
+
+    # description
+    (?:/\*(.*?)\*/)?''' % DEAD_PREFIX)
+
+#: The prefix used for keypad keys
+KEYPAD_PREFIX = 'KP_'
+
+#: The regular expresion used to extract keypad key values; they are on the
+#: form:
+#:
+#:     #define XK_KP_<name> <hex keysym> [/* description */]
+KP_KEYPAD_RE = re.compile(r'''(?mx)
+    # name
+    \#define \s+ XK_(%s[a-zA-Z0-9_]+)\s+
+
+    # keysym
+    0x([0-9a-fA-F]+)\s*
+
+    # codepoint, not present
+    ()
+
+    # description
+    (?:/\*(.*?)\*/)?''' % KEYPAD_PREFIX)
+
+
+def definitions(data):
+    """Yields all keysym as the tuple ``(name, keysym, (first, second))``.
+
+    ``(first, second))`` is a tuple of codepoints. The first value is the one
+    to use in the lookup table, and the second one is used only by dead keys to
+    indicate the non-combining version. If both are ``None``, the keysym is a
+    keypad key.
+
+    If a codepoint is ``None``, the definition is for a dead key with no
+    unicode codepoint.
+    """
+
+"""
+Converts <keysymdef.h> to Python mappings.
+"""
+
+import datetime
+import re
+import sys
+import unicodedata
+
+
+KEYSYM_RE = re.compile(r'''(?mx)
+    \#define \s+ XK_([a-zA-Z0-9_]+)\s+
+
+    0x([0-9a-fA-F]+)\s+
+
+    /\*\s* U\+([0-9a-fA-F]+)\s+.*?\*/
+
+    ()''')
+
+DEAD_PREFIX = 'dead_'
+
+DEAD_KEYSYM_RE = re.compile(r'''(?mx)
+    \#define \s+ XK_(%s[a-zA-Z0-9_]+)\s+
+
+    0x([0-9a-fA-F]+)\s*
+
+    ()
+
+    (?:/\*(.*?)\*/)?''' % DEAD_PREFIX)
+
+KEYPAD_PREFIX = 'KP_'
+
+KP_KEYPAD_RE = re.compile(r'''(?mx)
+    \#define \s+ XK_(%s[a-zA-Z0-9_]+)\s+
+
+    0x([0-9a-fA-F]+)\s*
+
+    ()
+
+    (?:/\*(.*?)\*/)?''' % KEYPAD_PREFIX)
+
+
+def definitions(data):
+    """Yields all keysym as the tuple ``(name, keysym, (first, second))``.
+
+    ``(first, second))`` is a tuple of codepoints. The first value is the one
+    to use in the lookup table, and the second one is used only by dead keys to
+    indicate the non-combining version. If both are ``None``, the keysym is a
+    keypad key.
+
+    If a codepoint is ``None``, the definition is for a dead key with no
+    unicode codepoint.
+    """    for line in data:
+        for regex in (KEYSYM_RE, DEAD_KEYSYM_RE, KP_KEYPAD_RE):
+            m = regex.search(line)
+            if m:
+                name, keysym, codepoint, description = m.groups()
+                if codepoint:
+                    # If the code point is specified, this keysym corresponds
+                    # to a normal character
+                    yield (
+                        name,
+                        (keysym, (codepoint, codepoint)))
+                    break
+
+                elif name.startswith(DEAD_PREFIX) and (
+                        not description or 'alias for' not in description):
+                    yield (
+                        name,
+                        (keysym, DEAD_CODEPOINTS.get(
+                            name[len(DEAD_PREFIX):],
+                            (None, None))))
+                    break
+
+                elif name.startswith(KEYPAD_PREFIX):
+                    yield (
+                        name,
+                        (keysym, (None, None)))
+                    break

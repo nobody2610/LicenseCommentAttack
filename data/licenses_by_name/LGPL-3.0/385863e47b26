@@ -1,0 +1,73 @@
+# -*- coding: utf-8 -*-
+# This file is part of pygal
+#
+# A python svg graph plotting library
+# Copyright © 2012-2016 Kozea
+#
+# This library is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# This library is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with pygal. If not, see <http://www.gnu.org/licenses/>.
+"""
+This package is an utility package oriented on color alteration.
+This is used by the :py:mod:`pygal.style` package to generate
+parametric styles.
+
+"""
+from __future__ import division
+
+
+def parse_color(color):
+    """Take any css color definition and give back a tuple containing the
+    r, g, b, a values along with a type which can be: #rgb, #rgba, #rrggbb,
+    #rrggbbaa, rgb, rgba
+    """
+
+"""
+This package is an utility package oriented on color alteration.
+This is used by the :py:mod:`pygal.style` package to generate
+parametric styles.
+
+"""
+from __future__ import division
+
+
+def parse_color(color):
+    """Take any css color definition and give back a tuple containing the
+    r, g, b, a values along with a type which can be: #rgb, #rgba, #rrggbb,
+    #rrggbbaa, rgb, rgba
+    """    r = g = b = a = type = None
+    if color.startswith('#'):
+        color = color[1:]
+        if len(color) == 3:
+            type = '#rgb'
+            color = color + 'f'
+        if len(color) == 4:
+            type = type or '#rgba'
+            color = ''.join([c * 2 for c in color])
+        if len(color) == 6:
+            type = type or '#rrggbb'
+            color = color + 'ff'
+        assert len(color) == 8
+        type = type or '#rrggbbaa'
+        r, g, b, a = [
+            int(''.join(c), 16) for c in zip(color[::2], color[1::2])]
+        a /= 255
+    elif color.startswith('rgb('):
+        type = 'rgb'
+        color = color[4:-1]
+        r, g, b, a = [int(c) for c in color.split(',')] + [1]
+    elif color.startswith('rgba('):
+        type = 'rgba'
+        color = color[5:-1]
+        r, g, b, a = [int(c) for c in color.split(',')[:-1]] + [
+            float(color.split(',')[-1])]
+    return r, g, b, a, type

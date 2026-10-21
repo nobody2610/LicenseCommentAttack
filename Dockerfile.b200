@@ -1,0 +1,49 @@
+# B200 (Blackwell, sm_100) runtime for the licence-attack experiments.
+#
+# The host conda env is torch 2.6.0+cu124, whose compiled arch list stops at sm_90 --
+# it fails on Blackwell with "no kernel image is available for execution on the
+# device". Rather than rebuild that env, this starts from an NGC image that already
+# ships Blackwell kernels, cuDNN and NCCL, and adds only what the project imports on
+# top. Pinning the image also pins the bf16 kernel selection, which matters here: the
+# attack's accept criterion is a margin comparison, and we have already seen the same
+# comment score differently under different batch shapes.
+#
+# Build:
+#   docker build -t licatk:b200 -f Dockerfile.b200 .
+#
+# The image contains NO models and NO dataset -- both are bind-mounted at run time,
+# so the image stays small and the 86 GB of weights are never copied into a layer.
+FROM nvcr.io/nvidia/pytorch:25.06-py3
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    HF_HUB_DISABLE_TELEMETRY=1
+
+# transformers/accelerate are pinned to the versions the results were produced with.
+# torch itself is NOT reinstalled: the NGC build is the Blackwell-capable one, and
+# pulling torch from PyPI here would silently replace it with a generic wheel.
+RUN pip install --no-cache-dir \
+        "transformers==4.57.6" \
+        "accelerate==1.13.0" \
+        "tokenizers>=0.22" \
+        "safetensors>=0.7" \
+        "modelscope==1.37.1" \
+        "pyyaml==6.0.3" \
+        "tqdm==4.67.3" \
+        "matplotlib==3.11.0" \
+        "datasets" \
+        "requests" \
+    && python -c "import torch, transformers; print(torch.__version__, transformers.__version__)"
+
+WORKDIR /workspace
+
+# Where the runners look for weights. Overridden per host by -e LIC_MODEL_ROOT=...
+ENV LIC_MODEL_ROOT=/models
+
+# Fail fast and loudly if the image lands on a GPU its kernels do not cover, instead
+# of dying thousands of steps into a run.
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

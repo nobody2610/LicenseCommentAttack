@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright © Spyder Project Contributors
+# Licensed under the terms of the MIT License
+# (see spyder/__init__.py for details)
+
+"""
+Source code text utilities
+"""
+
+import re
+import os
+import sys
+
+from spyder.py3compat import PY2
+if PY2:
+    from itertools import izip as zip
+
+# Order is important:
+EOL_CHARS = (("\r\n", 'nt'), ("\n", 'posix'), ("\r", 'mac'))
+
+ALL_LANGUAGES = {
+                 'Python': ('py', 'pyw', 'python', 'ipy'),
+                 'Cython': ('pyx', 'pxi', 'pxd'),
+                 'Enaml': ('enaml',),
+                 'Fortran77': ('f', 'for', 'f77'),
+                 'Fortran': ('f90', 'f95', 'f2k'),
+                 'Idl': ('pro',),
+                 'Diff': ('diff', 'patch', 'rej'),
+                 'GetText': ('po', 'pot'),
+                 'Nsis': ('nsi', 'nsh'),
+                 'Html': ('htm', 'html'),
+                 'Cpp': ('c', 'cc', 'cpp', 'cxx', 'h', 'hh', 'hpp', 'hxx'),
+                 'OpenCL': ('cl',),
+                 'Yaml':('yaml','yml'),
+                 "Markdown": ('md', 'mdw'),
+                 }
+
+PYTHON_LIKE_LANGUAGES = ('Python', 'Cython', 'Enaml')
+
+CELL_LANGUAGES = {'Python': ('#%%', '# %%', '# <codecell>', '# In[')}
+
+
+def get_primary_at(source_code, offset, retry=True):
+    """Return Python object in *source_code* at *offset*
+    Periods to the left of the cursor are carried forward 
+      e.g. 'functools.par^tial' would yield 'functools.partial'
+    Retry prevents infinite recursion: retry only once
+    """
+
+
+"""
+Source code text utilities
+"""
+
+import re
+import os
+import sys
+
+from spyder.py3compat import PY2
+if PY2:
+    from itertools import izip as zip
+
+EOL_CHARS = (("\r\n", 'nt'), ("\n", 'posix'), ("\r", 'mac'))
+
+ALL_LANGUAGES = {
+                 'Python': ('py', 'pyw', 'python', 'ipy'),
+                 'Cython': ('pyx', 'pxi', 'pxd'),
+                 'Enaml': ('enaml',),
+                 'Fortran77': ('f', 'for', 'f77'),
+                 'Fortran': ('f90', 'f95', 'f2k'),
+                 'Idl': ('pro',),
+                 'Diff': ('diff', 'patch', 'rej'),
+                 'GetText': ('po', 'pot'),
+                 'Nsis': ('nsi', 'nsh'),
+                 'Html': ('htm', 'html'),
+                 'Cpp': ('c', 'cc', 'cpp', 'cxx', 'h', 'hh', 'hpp', 'hxx'),
+                 'OpenCL': ('cl',),
+                 'Yaml':('yaml','yml'),
+                 "Markdown": ('md', 'mdw'),
+                 }
+
+PYTHON_LIKE_LANGUAGES = ('Python', 'Cython', 'Enaml')
+
+CELL_LANGUAGES = {'Python': ('#%%', '# %%', '# <codecell>', '# In[')}
+
+
+def get_primary_at(source_code, offset, retry=True):
+    """Return Python object in *source_code* at *offset*
+    Periods to the left of the cursor are carried forward 
+      e.g. 'functools.par^tial' would yield 'functools.partial'
+    Retry prevents infinite recursion: retry only once
+    """    obj = ''
+    left = re.split(r"[^0-9a-zA-Z_.]", source_code[:offset])
+    if left and left[-1]:
+        obj = left[-1]
+    right = re.split(r"\W", source_code[offset:])
+    if right and right[0]:
+        obj += right[0]
+    if obj and obj[0].isdigit():
+        obj = ''
+    # account for opening chars with no text to the right
+    if not obj and retry and offset and source_code[offset - 1] in '([.':
+        return get_primary_at(source_code, offset - 1, retry=False)
+    return obj

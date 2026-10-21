@@ -1,0 +1,51 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import unicode_literals
+
+from collections import OrderedDict
+from itertools import groupby
+from operator import itemgetter
+
+WHITESPACE_CHARACTERS = ' \t'
+
+def all_dependencies(*targets, **kwargs):
+    """Return a list containing |targets| and all the dependencies of
+    those targets.
+
+    The relative order of targets is maintained if possible.
+
+    """
+
+
+from __future__ import unicode_literals
+
+from collections import OrderedDict
+from itertools import groupby
+from operator import itemgetter
+
+WHITESPACE_CHARACTERS = ' \t'
+
+def all_dependencies(*targets, **kwargs):
+    """Return a list containing |targets| and all the dependencies of
+    those targets.
+
+    The relative order of targets is maintained if possible.
+
+    """    dm = kwargs.pop('dependency_map', None)
+    if dm is None:
+        dm = dependency_map(targets)
+
+    all_targets = OrderedDict() # Used as an ordered set.
+
+    for target in targets:
+        all_targets[target] = True
+        if target in dm:
+            for dependency in dm[target]:
+                # Move element back in the ordered set.
+                if dependency in all_targets:
+                    del all_targets[dependency]
+                all_targets[dependency] = True
+
+    return all_targets.keys()

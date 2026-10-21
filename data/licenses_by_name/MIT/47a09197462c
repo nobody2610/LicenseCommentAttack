@@ -1,0 +1,136 @@
+###############################################################################
+#
+# The MIT License (MIT)
+#
+# Copyright (c) Crossbar.io Technologies GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+###############################################################################
+
+
+from __future__ import absolute_import
+
+import itertools
+import six
+import random
+from functools import partial
+
+import txaio
+
+from autobahn.util import ObservableMixin
+from autobahn.websocket.util import parse_url as parse_ws_url
+from autobahn.rawsocket.util import parse_url as parse_rs_url
+
+from autobahn.wamp.types import ComponentConfig, SubscribeOptions, RegisterOptions
+from autobahn.wamp.exception import SessionNotReady, ApplicationError
+from autobahn.wamp.auth import create_authenticator, IAuthenticator
+from autobahn.wamp.serializer import SERID_TO_SER
+
+
+__all__ = (
+    'Component'
+)
+
+
+def _validate_endpoint(endpoint, check_native_endpoint=None):
+    """
+    Check a WAMP connecting endpoint configuration.
+    """
+
+
+
+from __future__ import absolute_import
+
+import itertools
+import six
+import random
+from functools import partial
+
+import txaio
+
+from autobahn.util import ObservableMixin
+from autobahn.websocket.util import parse_url as parse_ws_url
+from autobahn.rawsocket.util import parse_url as parse_rs_url
+
+from autobahn.wamp.types import ComponentConfig, SubscribeOptions, RegisterOptions
+from autobahn.wamp.exception import SessionNotReady, ApplicationError
+from autobahn.wamp.auth import create_authenticator, IAuthenticator
+from autobahn.wamp.serializer import SERID_TO_SER
+
+
+__all__ = (
+    'Component'
+)
+
+
+def _validate_endpoint(endpoint, check_native_endpoint=None):
+    """
+    Check a WAMP connecting endpoint configuration.
+    """    if check_native_endpoint:
+        check_native_endpoint(endpoint)
+    elif not isinstance(endpoint, dict):
+        raise ValueError(
+            "'endpoint' must be a dict"
+        )
+
+    # note, we're falling through here -- check_native_endpoint can
+    # disallow or allow dict-based config as it likes, but if it
+    # *does* allow a dict through, we want to check "base options"
+    # here so that both Twisted and asyncio don't have to check these
+    # things as well.
+    if isinstance(endpoint, dict):
+        # XXX what about filling in anything missing from the URL? Or
+        # is that only for when *nothing* is provided for endpoint?
+        if 'type' not in endpoint:
+            # could maybe just make tcp the default?
+            raise ValueError("'type' required in endpoint configuration")
+        if endpoint['type'] not in ['tcp', 'unix']:
+            raise ValueError('invalid type "{}" in endpoint'.format(endpoint['type']))
+
+        for k in endpoint.keys():
+            if k not in ['type', 'host', 'port', 'path', 'tls']:
+                raise ValueError(
+                    "Invalid key '{}' in endpoint configuration".format(k)
+                )
+
+        if endpoint['type'] == 'tcp':
+            for k in ['host', 'port']:
+                if k not in endpoint:
+                    raise ValueError(
+                        "'{}' required in 'tcp' endpoint config".format(k)
+                    )
+            for k in ['path']:
+                if k in endpoint:
+                    raise ValueError(
+                        "'{}' not valid in 'tcp' endpoint config".format(k)
+                    )
+        elif endpoint['type'] == 'unix':
+            for k in ['path']:
+                if k not in endpoint:
+                    raise ValueError(
+                        "'{}' required for 'unix' endpoint config".format(k)
+                    )
+            for k in ['host', 'port', 'tls']:
+                if k in endpoint:
+                    raise ValueError(
+                        "'{}' not valid in 'unix' endpoint config".format(k)
+                    )
+        else:
+            assert False, 'should not arrive here'

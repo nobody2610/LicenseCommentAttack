@@ -1,0 +1,106 @@
+# -------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for
+# license information.
+# --------------------------------------------------------------------------
+from dateutil import parser
+
+from ._common_conversion import _to_str
+
+try:
+    from xml.etree import cElementTree as ETree
+except ImportError:
+    from xml.etree import ElementTree as ETree
+
+from .models import (
+    ServiceProperties,
+    Logging,
+    Metrics,
+    CorsRule,
+    AccessPolicy,
+    _dict,
+    GeoReplication,
+    ServiceStats,
+    DeleteRetentionPolicy,
+    StaticWebsite,
+)
+
+
+def _convert_xml_to_signed_identifiers(response):
+    '''
+    <?xml version="1.0" encoding="utf-8"?>
+    <SignedIdentifiers>
+      <SignedIdentifier>
+        <Id>unique-value</Id>
+        <AccessPolicy>
+          <Start>start-time</Start>
+          <Expiry>expiry-time</Expiry>
+          <Permission>abbreviated-permission-list</Permission>
+        </AccessPolicy>
+      </SignedIdentifier>
+    </SignedIdentifiers>
+    '''
+
+from dateutil import parser
+
+from ._common_conversion import _to_str
+
+try:
+    from xml.etree import cElementTree as ETree
+except ImportError:
+    from xml.etree import ElementTree as ETree
+
+from .models import (
+    ServiceProperties,
+    Logging,
+    Metrics,
+    CorsRule,
+    AccessPolicy,
+    _dict,
+    GeoReplication,
+    ServiceStats,
+    DeleteRetentionPolicy,
+    StaticWebsite,
+)
+
+
+def _convert_xml_to_signed_identifiers(response):
+    '''
+    <?xml version="1.0" encoding="utf-8"?>
+    <SignedIdentifiers>
+      <SignedIdentifier>
+        <Id>unique-value</Id>
+        <AccessPolicy>
+          <Start>start-time</Start>
+          <Expiry>expiry-time</Expiry>
+          <Permission>abbreviated-permission-list</Permission>
+        </AccessPolicy>
+      </SignedIdentifier>
+    </SignedIdentifiers>
+    '''    if response is None or response.body is None:
+        return None
+
+    list_element = ETree.fromstring(response.body)
+    signed_identifiers = _dict()
+
+    for signed_identifier_element in list_element.findall('SignedIdentifier'):
+        # Id element
+        id = signed_identifier_element.find('Id').text
+
+        # Access policy element
+        access_policy = AccessPolicy()
+        access_policy_element = signed_identifier_element.find('AccessPolicy')
+        if access_policy_element is not None:
+            start_element = access_policy_element.find('Start')
+            if start_element is not None:
+                access_policy.start = parser.parse(start_element.text)
+
+            expiry_element = access_policy_element.find('Expiry')
+            if expiry_element is not None:
+                access_policy.expiry = parser.parse(expiry_element.text)
+
+            access_policy.permission = access_policy_element.findtext('Permission')
+
+        signed_identifiers[id] = access_policy
+
+    return signed_identifiers

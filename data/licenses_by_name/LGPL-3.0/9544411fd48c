@@ -1,0 +1,182 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2009  Rene Liebscher
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free 
+# Software Foundation; either version 3 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT 
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>.
+#
+"""
+Helper functions for calculation with fuzzy sets.
+
+Examples can be found here U{http://pyfuzzy.sourceforge.net/demo/merge/}
+
+* Intersection of set1 and set2 can be done by
+  
+  C{set = merge(T_NORM,set1,set2)}
+  
+  where T_NORM is a t-norm eg. Min.
+  (or a function which accepts two parameters as min().)
+
+* Union of set1 and set2 can be done by
+  
+  C{set = merge(S_NORM,set1,set2)}
+  
+  where S_NORM is a s-norm eg. Max.
+  (or a function which accepts two parameters as max().)
+
+* Complement of set1 can be done by
+  
+  C{set = norm(lambda a,b:1.0-a ,set1,0.0)}
+  
+  using a user defined function for it.
+  (The second parameter is ignored or better said
+  it doesn't influence the value, it only influences
+  maybe where the points of the resulting polygon are
+  set.)
+
+* Activation function can be done by
+  
+  C{set = norm(act_norm,set,act_value)}
+  
+  where act_norm is any L{fuzzy.norm} or two params function (eg. min)
+  and act_value is the result of a rule calculation.
+"""
+
+__revision__ = "$Id: operations.py,v 1.13 2013-01-09 20:10:19 rliebscher Exp $"
+
+from fuzzy.Exception import FuzzyException
+
+# helper functions
+def _find_root(f, x1, x2, f1=None, f2=None, epsilon=None):
+    """Find root of function f between x1,x2 by using the regula falsi method
+       with the pegasus modification.
+       See also U{http://de.wikipedia.org/wiki/Regula_Falsi}. (The english
+       version lacks the description of pegasus modification.)
+       The algorithm stops if the error estimation is smaller than epsilon
+       or there is an ZeroDivisionError, which means both values f1 and f2 are
+       identical (should be 0 then).
+       
+       @param f: function for which to find M{f(x)=0}
+       @type f: M{f(x)}
+       @param x1: left border of range
+       @type x1: float
+       @param x2: right border of range
+       @type x2: float
+       @param f1: value for x1, if available
+       @type f1: float
+       @param f2: value for x2, if available
+       @type f2: float
+       @param epsilon: break condition for algorithm (value < epsilon)
+       @type epsilon: float/None
+       @return: M{x} where M{f(x)=0}
+       @rtype: float
+    """
+
+"""
+Helper functions for calculation with fuzzy sets.
+
+Examples can be found here U{http://pyfuzzy.sourceforge.net/demo/merge/}
+
+* Intersection of set1 and set2 can be done by
+  
+  C{set = merge(T_NORM,set1,set2)}
+  
+  where T_NORM is a t-norm eg. Min.
+  (or a function which accepts two parameters as min().)
+
+* Union of set1 and set2 can be done by
+  
+  C{set = merge(S_NORM,set1,set2)}
+  
+  where S_NORM is a s-norm eg. Max.
+  (or a function which accepts two parameters as max().)
+
+* Complement of set1 can be done by
+  
+  C{set = norm(lambda a,b:1.0-a ,set1,0.0)}
+  
+  using a user defined function for it.
+  (The second parameter is ignored or better said
+  it doesn't influence the value, it only influences
+  maybe where the points of the resulting polygon are
+  set.)
+
+* Activation function can be done by
+  
+  C{set = norm(act_norm,set,act_value)}
+  
+  where act_norm is any L{fuzzy.norm} or two params function (eg. min)
+  and act_value is the result of a rule calculation.
+"""
+
+__revision__ = "$Id: operations.py,v 1.13 2013-01-09 20:10:19 rliebscher Exp $"
+
+from fuzzy.Exception import FuzzyException
+
+def _find_root(f, x1, x2, f1=None, f2=None, epsilon=None):
+    """Find root of function f between x1,x2 by using the regula falsi method
+       with the pegasus modification.
+       See also U{http://de.wikipedia.org/wiki/Regula_Falsi}. (The english
+       version lacks the description of pegasus modification.)
+       The algorithm stops if the error estimation is smaller than epsilon
+       or there is an ZeroDivisionError, which means both values f1 and f2 are
+       identical (should be 0 then).
+       
+       @param f: function for which to find M{f(x)=0}
+       @type f: M{f(x)}
+       @param x1: left border of range
+       @type x1: float
+       @param x2: right border of range
+       @type x2: float
+       @param f1: value for x1, if available
+       @type f1: float
+       @param f2: value for x2, if available
+       @type f2: float
+       @param epsilon: break condition for algorithm (value < epsilon)
+       @type epsilon: float/None
+       @return: M{x} where M{f(x)=0}
+       @rtype: float
+    """    if f1 is None:
+        f1 = f(x1)
+    if f2 is None:
+        f2 = f(x2)
+    if f1 * f2 > 0.:
+        raise FuzzyException("need interval with root")
+    if epsilon is None:
+        epsilon = 1.e-10
+    epsx = epsz = epsilon
+    z = (x1+x2)/2.
+    try:
+        i = 0
+        while i < 1000:
+            i += 1
+            z = x1 - f1 * (x2 - x1) / (f2 - f1) # approximation for root
+            fz = f(z)
+
+            #print x1,z,x2,f1,fz,f2
+            # smaller than epsilon: return z as approximation
+            if abs(x2 - x1) <= epsx or abs(fz) <= epsz:
+                return z
+
+            # root in [f(xz), f(x2)]?:
+            if fz * f2 < 0.:
+                # check [z, x2], but exchange borders
+                x1,x2,f1,f2 = x2,z,f2,fz
+            else:
+                # check [x1, z], and modify the value f1,
+                # so next steps x1 will move
+                x1,x2,f1,f2 = x1,z,f1*f2/(f2+fz),fz
+        raise FuzzyException("Too much iterations: %d" % i)
+    except ZeroDivisionError:
+        #print "ZeroDivisionError"
+        return z

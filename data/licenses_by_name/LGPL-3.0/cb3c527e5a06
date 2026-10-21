@@ -1,0 +1,89 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tools for working with the host system"""
+# Copyright 2012 Canonical Ltd.
+#
+# Authors:
+#  Nick Moffitt <nick.moffitt@canonical.com>
+#  Matthew Wedgwood <matthew.wedgwood@canonical.com>
+
+import os
+import re
+import pwd
+import glob
+import grp
+import random
+import string
+import subprocess
+import hashlib
+from contextlib import contextmanager
+from collections import OrderedDict
+
+import six
+
+from .hookenv import log
+from .fstab import Fstab
+
+
+def service_resume(service_name, init_dir="/etc/init",
+                   initd_dir="/etc/init.d"):
+    """Resume a system service.
+
+    Reenable starting again at boot. Start the service"""
+
+
+"""Tools for working with the host system"""
+
+import os
+import re
+import pwd
+import glob
+import grp
+import random
+import string
+import subprocess
+import hashlib
+from contextlib import contextmanager
+from collections import OrderedDict
+
+import six
+
+from .hookenv import log
+from .fstab import Fstab
+
+
+def service_resume(service_name, init_dir="/etc/init",
+                   initd_dir="/etc/init.d"):
+    """Resume a system service.
+
+    Reenable starting again at boot. Start the service"""    upstart_file = os.path.join(init_dir, "{}.conf".format(service_name))
+    sysv_file = os.path.join(initd_dir, service_name)
+    if os.path.exists(upstart_file):
+        override_path = os.path.join(
+            init_dir, '{}.override'.format(service_name))
+        if os.path.exists(override_path):
+            os.unlink(override_path)
+    elif os.path.exists(sysv_file):
+        subprocess.check_call(["update-rc.d", service_name, "enable"])
+    else:
+        # XXX: Support SystemD too
+        raise ValueError(
+            "Unable to detect {0} as either Upstart {1} or SysV {2}".format(
+                service_name, upstart_file, sysv_file))
+
+    started = service_start(service_name)
+    return started

@@ -1,0 +1,89 @@
+"""
+"""
+
+# Created on 2014.09.08
+#
+# Author: Giovanni Cannata
+#
+# Copyright 2014 - 2018 Giovanni Cannata
+#
+# This file is part of ldap3.
+#
+# ldap3 is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ldap3 is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with ldap3 in the COPYING and COPYING.LESSER files.
+# If not, see <http://www.gnu.org/licenses/>.
+
+from string import hexdigits, ascii_letters, digits
+
+from .. import SEQUENCE_TYPES
+from ..core.exceptions import LDAPInvalidDnError
+
+
+STATE_ANY = 0
+STATE_ESCAPE = 1
+STATE_ESCAPE_HEX = 2
+
+
+def to_dn(iterator, decompose=False, remove_space=False, space_around_equal=False, separate_rdn=False):
+    """
+    Convert an iterator to a list of dn parts
+    if decompose=True return a list of tuple (one for each dn component) else return a list of strings
+    if remove_space=True removes unneeded spaces
+    if space_around_equal=True add spaces around equal in returned strings
+    if separate_rdn=True consider multiple RDNs as different component of DN
+    """
+
+"""
+"""
+
+
+from string import hexdigits, ascii_letters, digits
+
+from .. import SEQUENCE_TYPES
+from ..core.exceptions import LDAPInvalidDnError
+
+
+STATE_ANY = 0
+STATE_ESCAPE = 1
+STATE_ESCAPE_HEX = 2
+
+
+def to_dn(iterator, decompose=False, remove_space=False, space_around_equal=False, separate_rdn=False):
+    """
+    Convert an iterator to a list of dn parts
+    if decompose=True return a list of tuple (one for each dn component) else return a list of strings
+    if remove_space=True removes unneeded spaces
+    if space_around_equal=True add spaces around equal in returned strings
+    if separate_rdn=True consider multiple RDNs as different component of DN
+    """    dn = []
+    component = ''
+    escape_sequence = False
+    for c in iterator:
+        if c == '\\':  # escape sequence
+            escape_sequence = True
+        elif escape_sequence and c != ' ':
+            escape_sequence = False
+        elif c == '+' and separate_rdn:
+            dn.append(_add_ava(component, decompose, remove_space, space_around_equal))
+            component = ''
+            continue
+        elif c == ',':
+            if '=' in component:
+                dn.append(_add_ava(component, decompose, remove_space, space_around_equal))
+                component = ''
+                continue
+
+        component += c
+
+    dn.append(_add_ava(component, decompose, remove_space, space_around_equal))
+    return dn

@@ -1,0 +1,107 @@
+# -*- coding: utf-8 -*-
+"""Tools for inspecting Python objects.
+
+Uses syntax highlighting for presenting the various information elements.
+
+Similar in spirit to the inspect module, but all calls take a name argument to
+reference the name under which an object is being read.
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2001-2004 Fernando Perez <fperez@colorado.edu>
+#
+#  Distributed under the terms of the BSD License.  The full license is in
+#  the file COPYING, distributed as part of this software.
+#*****************************************************************************
+
+__all__ = ['Inspector','InspectColors']
+
+# stdlib modules
+import __builtin__
+import StringIO
+import inspect
+import linecache
+import os
+import string
+import sys
+import types
+
+# IPython's own
+from IPython import PyColorize
+from IPython.genutils import page,indent,Term
+from IPython.Itpl import itpl
+from IPython.wildcard import list_namespace
+from IPython.ColorANSI import *
+
+#****************************************************************************
+# HACK!!! This is a crude fix for bugs in python 2.3's inspect module.  We
+# simply monkeypatch inspect with code copied from python 2.4.
+if sys.version_info[:2] == (2,3):
+    from inspect import ismodule, getabsfile, modulesbyfile
+    
+def getdoc(obj):
+    """Stable wrapper around inspect.getdoc.
+
+    This can't crash because of attribute problems.
+
+    It also attempts to call a getdoc() method on the given object.  This
+    allows objects which provide their docstrings via non-standard mechanisms
+    (like Pyro proxies) to still be inspected by ipython's ? system."""
+
+"""Tools for inspecting Python objects.
+
+Uses syntax highlighting for presenting the various information elements.
+
+Similar in spirit to the inspect module, but all calls take a name argument to
+reference the name under which an object is being read.
+"""
+
+
+__all__ = ['Inspector','InspectColors']
+
+import __builtin__
+import StringIO
+import inspect
+import linecache
+import os
+import string
+import sys
+import types
+
+from IPython import PyColorize
+from IPython.genutils import page,indent,Term
+from IPython.Itpl import itpl
+from IPython.wildcard import list_namespace
+from IPython.ColorANSI import *
+
+if sys.version_info[:2] == (2,3):
+    from inspect import ismodule, getabsfile, modulesbyfile
+    
+def getdoc(obj):
+    """Stable wrapper around inspect.getdoc.
+
+    This can't crash because of attribute problems.
+
+    It also attempts to call a getdoc() method on the given object.  This
+    allows objects which provide their docstrings via non-standard mechanisms
+    (like Pyro proxies) to still be inspected by ipython's ? system."""
+
+    ds = None  # default return value
+    try:
+        ds = inspect.getdoc(obj)
+    except:
+        # Harden against an inspect failure, which can occur with
+        # SWIG-wrapped extensions.
+        pass
+    # Allow objects to offer customized documentation via a getdoc method:
+    try:
+        ds2 = obj.getdoc()
+    except:
+        pass
+    else:
+        # if we get extra info, we add it to the normal docstring.
+        if ds is None:
+            ds = ds2
+        else:
+            ds = '%s\n%s' % (ds,ds2)
+    return ds

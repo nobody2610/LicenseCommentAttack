@@ -1,0 +1,169 @@
+# Authors: Alexandre Gramfort <alexandre.gramfort@inria.fr>
+#          Mathieu Blondel <mathieu@mblondel.org>
+#          Olivier Grisel <olivier.grisel@ensta.org>
+#          Andreas Mueller <amueller@ais.uni-bonn.de>
+#          Eric Martin <eric@ericmart.in>
+# License: BSD 3 clause
+
+from itertools import chain, combinations
+import numbers
+import warnings
+
+import numpy as np
+from scipy import sparse
+
+from ..base import BaseEstimator, TransformerMixin
+from ..externals import six
+from ..utils import check_array
+from ..utils import warn_if_not_float
+from ..utils.extmath import row_norms
+from ..utils.fixes import (combinations_with_replacement as combinations_w_r,
+                           bincount)
+from ..utils.fixes import isclose
+from ..utils.sparsefuncs_fast import (inplace_csr_row_normalize_l1,
+                                      inplace_csr_row_normalize_l2)
+from ..utils.sparsefuncs import (inplace_column_scale, mean_variance_axis)
+from ..utils.validation import check_is_fitted
+
+zip = six.moves.zip
+map = six.moves.map
+range = six.moves.range
+
+__all__ = [
+    'Binarizer',
+    'KernelCenterer',
+    'MinMaxScaler',
+    'Normalizer',
+    'OneHotEncoder',
+    'StandardScaler',
+    'add_dummy_feature',
+    'binarize',
+    'normalize',
+    'scale',
+]
+
+
+def add_dummy_feature(X, value=1.0):
+    """Augment dataset with an additional dummy feature.
+
+    This is useful for fitting an intercept term with implementations which
+    cannot otherwise fit it directly.
+
+    Parameters
+    ----------
+    X : array or scipy.sparse matrix with shape [n_samples, n_features]
+        Data.
+
+    value : float
+        Value to use for the dummy feature.
+
+    Returns
+    -------
+
+    X : array or scipy.sparse matrix with shape [n_samples, n_features + 1]
+        Same data with dummy feature added as first column.
+
+    Examples
+    --------
+
+    >>> from sklearn.preprocessing import add_dummy_feature
+    >>> add_dummy_feature([[0, 1], [1, 0]])
+    array([[ 1.,  0.,  1.],
+           [ 1.,  1.,  0.]])
+    """
+
+
+from itertools import chain, combinations
+import numbers
+import warnings
+
+import numpy as np
+from scipy import sparse
+
+from ..base import BaseEstimator, TransformerMixin
+from ..externals import six
+from ..utils import check_array
+from ..utils import warn_if_not_float
+from ..utils.extmath import row_norms
+from ..utils.fixes import (combinations_with_replacement as combinations_w_r,
+                           bincount)
+from ..utils.fixes import isclose
+from ..utils.sparsefuncs_fast import (inplace_csr_row_normalize_l1,
+                                      inplace_csr_row_normalize_l2)
+from ..utils.sparsefuncs import (inplace_column_scale, mean_variance_axis)
+from ..utils.validation import check_is_fitted
+
+zip = six.moves.zip
+map = six.moves.map
+range = six.moves.range
+
+__all__ = [
+    'Binarizer',
+    'KernelCenterer',
+    'MinMaxScaler',
+    'Normalizer',
+    'OneHotEncoder',
+    'StandardScaler',
+    'add_dummy_feature',
+    'binarize',
+    'normalize',
+    'scale',
+]
+
+
+def add_dummy_feature(X, value=1.0):
+    """Augment dataset with an additional dummy feature.
+
+    This is useful for fitting an intercept term with implementations which
+    cannot otherwise fit it directly.
+
+    Parameters
+    ----------
+    X : array or scipy.sparse matrix with shape [n_samples, n_features]
+        Data.
+
+    value : float
+        Value to use for the dummy feature.
+
+    Returns
+    -------
+
+    X : array or scipy.sparse matrix with shape [n_samples, n_features + 1]
+        Same data with dummy feature added as first column.
+
+    Examples
+    --------
+
+    >>> from sklearn.preprocessing import add_dummy_feature
+    >>> add_dummy_feature([[0, 1], [1, 0]])
+    array([[ 1.,  0.,  1.],
+           [ 1.,  1.,  0.]])
+    """    X = check_array(X, accept_sparse=['csc', 'csr', 'coo'])
+    n_samples, n_features = X.shape
+    shape = (n_samples, n_features + 1)
+    if sparse.issparse(X):
+        if sparse.isspmatrix_coo(X):
+            # Shift columns to the right.
+            col = X.col + 1
+            # Column indices of dummy feature are 0 everywhere.
+            col = np.concatenate((np.zeros(n_samples), col))
+            # Row indices of dummy feature are 0, ..., n_samples-1.
+            row = np.concatenate((np.arange(n_samples), X.row))
+            # Prepend the dummy feature n_samples times.
+            data = np.concatenate((np.ones(n_samples) * value, X.data))
+            return sparse.coo_matrix((data, (row, col)), shape)
+        elif sparse.isspmatrix_csc(X):
+            # Shift index pointers since we need to add n_samples elements.
+            indptr = X.indptr + n_samples
+            # indptr[0] must be 0.
+            indptr = np.concatenate((np.array([0]), indptr))
+            # Row indices of dummy feature are 0, ..., n_samples-1.
+            indices = np.concatenate((np.arange(n_samples), X.indices))
+            # Prepend the dummy feature n_samples times.
+            data = np.concatenate((np.ones(n_samples) * value, X.data))
+            return sparse.csc_matrix((data, indices, indptr), shape)
+        else:
+            klass = X.__class__
+            return klass(add_dummy_feature(X.tocoo(), value))
+    else:
+        return np.hstack((np.ones((n_samples, 1)) * value, X))

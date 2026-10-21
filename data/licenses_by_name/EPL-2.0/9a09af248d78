@@ -1,0 +1,59 @@
+# Eclipse SUMO, Simulation of Urban MObility; see https://eclipse.org/sumo
+# Copyright (C) 2013-2017 German Aerospace Center (DLR) and others.
+# This program and the accompanying materials
+# are made available under the terms of the Eclipse Public License v2.0
+# which accompanies this distribution, and is available at
+# http://www.eclipse.org/legal/epl-v20.html
+
+# @file    geomhelper.py
+# @author  Daniel Krajzewicz
+# @author  Jakob Erdmann
+# @author  Michael Behrisch
+# @date    2013-02-25
+# @version $Id$
+
+from __future__ import absolute_import
+import math
+
+INVALID_DISTANCE = -1
+
+
+def polygonOffsetAndDistanceToPoint(point, polygon, perpendicular=False):
+    """Return the offset and the distance from the polygon start where the distance to the point is minimal"""
+
+
+
+from __future__ import absolute_import
+import math
+
+INVALID_DISTANCE = -1
+
+
+def polygonOffsetAndDistanceToPoint(point, polygon, perpendicular=False):
+    """Return the offset and the distance from the polygon start where the distance to the point is minimal"""    p = point
+    s = polygon
+    seen = 0
+    minDist = 1e400
+    minOffset = INVALID_DISTANCE
+    for i in range(len(s) - 1):
+        pos = lineOffsetWithMinimumDistanceToPoint(
+            p, s[i], s[i + 1], perpendicular)
+        dist = minDist if pos == INVALID_DISTANCE else distance(
+            p, positionAtOffset(s[i], s[i + 1], pos))
+        if dist < minDist:
+            minDist = dist
+            minOffset = pos + seen
+        if perpendicular and i != 0 and pos == INVALID_DISTANCE:
+            # even if perpendicular is set we still need to check the distance
+            # to the inner points
+            cornerDist = distance(p, s[i])
+            if cornerDist < minDist:
+                pos1 = lineOffsetWithMinimumDistanceToPoint(
+                    p, s[i - 1], s[i], False)
+                pos2 = lineOffsetWithMinimumDistanceToPoint(
+                    p, s[i], s[i + 1], False)
+                if pos1 == distance(s[i - 1], s[i]) and pos2 == 0.:
+                    minOffset = seen
+                    minDist = cornerDist
+        seen += distance(s[i], s[i + 1])
+    return minOffset, minDist

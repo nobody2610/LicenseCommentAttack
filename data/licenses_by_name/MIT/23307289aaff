@@ -1,0 +1,78 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root
+# for license information.
+
+import numbers
+import sys
+import time
+
+import pydevd
+from _pydevd_bundle.pydevd_comm import get_global_debugger
+
+from ptvsd.pydevd_hooks import install
+from ptvsd.runner import run as no_debug_runner
+from ptvsd.socket import Address
+from ptvsd._util import new_hidden_thread
+
+
+PYDEVD_DEFAULTS = {
+    '--json-dap',
+    '--qt-support=auto',
+}
+
+
+def _run(argv, addr, _pydevd=pydevd, _install=install, **kwargs):
+    """Start pydevd with the given commandline args."""
+
+
+import numbers
+import sys
+import time
+
+import pydevd
+from _pydevd_bundle.pydevd_comm import get_global_debugger
+
+from ptvsd.pydevd_hooks import install
+from ptvsd.runner import run as no_debug_runner
+from ptvsd.socket import Address
+from ptvsd._util import new_hidden_thread
+
+
+PYDEVD_DEFAULTS = {
+    '--json-dap',
+    '--qt-support=auto',
+}
+
+
+def _run(argv, addr, _pydevd=pydevd, _install=install, **kwargs):
+    """Start pydevd with the given commandline args."""
+    # Pydevd assumes that the "__main__" module is the "pydevd" module
+    # and does some tricky stuff under that assumption.  For example,
+    # when the debugger starts up it calls save_main_module()
+    # (in pydevd_bundle/pydevd_utils.py).  That function explicitly sets
+    # sys.modules["pydevd"] to sys.modules["__main__"] and then sets
+    # the __main__ module to a new one.  This makes some sense since
+    # it gives the debugged script a fresh __main__ module.
+    #
+    # This complicates things for us since we are running a different
+    # file (i.e. this one) as the __main__ module.  Consequently,
+    # sys.modules["pydevd"] gets set to ptvsd/__main__.py.  Subsequent
+    # imports of the "pydevd" module then return the wrong module.  We
+    # work around this by avoiding lazy imports of the "pydevd" module.
+    # We also replace the __main__ module with the "pydevd" module here.
+    if sys.modules['__main__'].__file__ != _pydevd.__file__:
+        sys.modules['__main___orig'] = sys.modules['__main__']
+        sys.modules['__main__'] = _pydevd
+
+    daemon = _install(_pydevd, addr, **kwargs)
+    sys.argv[:] = argv
+    try:
+        _pydevd.main()
+    except SystemExit as ex:
+        if ex.code is None:
+            daemon.exitcode = 0
+        elif isinstance(ex.code, numbers.Integral):
+            daemon.exitcode = int(ex.code)
+        else:
+            daemon.exitcode = 1
+        raise

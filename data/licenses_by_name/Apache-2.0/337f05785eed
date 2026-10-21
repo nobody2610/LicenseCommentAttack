@@ -1,0 +1,91 @@
+# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Python command line interface for running TOCO."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import argparse
+import os
+import sys
+
+from tensorflow.contrib.lite.python import lite
+from tensorflow.contrib.lite.toco import toco_flags_pb2 as _toco_flags_pb2
+from tensorflow.contrib.lite.toco import types_pb2 as _types_pb2
+from tensorflow.python.platform import app
+
+
+def _get_toco_converter(flags):
+  """Makes a TocoConverter object based on the flags provided.
+
+  Args:
+    flags: argparse.Namespace object containing TFLite flags.
+
+  Returns:
+    TocoConverter object.
+  """
+
+"""Python command line interface for running TOCO."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import argparse
+import os
+import sys
+
+from tensorflow.contrib.lite.python import lite
+from tensorflow.contrib.lite.toco import toco_flags_pb2 as _toco_flags_pb2
+from tensorflow.contrib.lite.toco import types_pb2 as _types_pb2
+from tensorflow.python.platform import app
+
+
+def _get_toco_converter(flags):
+  """Makes a TocoConverter object based on the flags provided.
+
+  Args:
+    flags: argparse.Namespace object containing TFLite flags.
+
+  Returns:
+    TocoConverter object.
+  """  # Parse input and output arrays.
+  input_arrays = _parse_array(flags.input_arrays)
+  input_shapes = None
+  if flags.input_shapes:
+    input_shapes_list = [
+        _parse_int_array(shape) for shape in flags.input_shapes.split(":")
+    ]
+    input_shapes = dict(zip(input_arrays, input_shapes_list))
+  output_arrays = _parse_array(flags.output_arrays)
+
+  converter_kwargs = {
+      "input_arrays": input_arrays,
+      "input_shapes": input_shapes,
+      "output_arrays": output_arrays
+  }
+
+  # Create TocoConverter.
+  if flags.graph_def_file:
+    converter_fn = lite.TocoConverter.from_frozen_graph
+    converter_kwargs["graph_def_file"] = flags.graph_def_file
+  elif flags.saved_model_dir:
+    converter_fn = lite.TocoConverter.from_saved_model
+    converter_kwargs["saved_model_dir"] = flags.saved_model_dir
+    converter_kwargs["tag_set"] = _parse_set(flags.saved_model_tag_set)
+    converter_kwargs["signature_key"] = flags.saved_model_signature_key
+
+  return converter_fn(**converter_kwargs)

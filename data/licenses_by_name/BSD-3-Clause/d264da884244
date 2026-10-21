@@ -1,0 +1,72 @@
+# Licensed under a 3-clause BSD style license - see PYFITS.rst
+
+import sys
+
+PY3 = sys.version_info[0] >= 3
+
+if PY3:  # pragma: py3
+    # Stuff to do if Python 3
+    import builtins
+    import io
+
+    # Bring back the cmp() function
+    builtins.cmp = lambda a, b: (a > b) - (a < b)
+
+    # Make the decode_ascii utility function actually work
+    from . import util
+    import numpy
+
+    def _fix_dtype(dtype):
+        """
+        Numpy has a bug (in Python3 only) that causes a segfault when
+        accessing the data of arrays containing nested arrays.  Specifically,
+        this happens if the shape of the subarray is not given as a tuple.
+        See http://projects.scipy.org/numpy/ticket/1766.
+        """
+
+
+import sys
+
+PY3 = sys.version_info[0] >= 3
+
+if PY3:  # pragma: py3
+    import builtins
+    import io
+
+    builtins.cmp = lambda a, b: (a > b) - (a < b)
+
+    from . import util
+    import numpy
+
+    def _fix_dtype(dtype):
+        """
+        Numpy has a bug (in Python3 only) that causes a segfault when
+        accessing the data of arrays containing nested arrays.  Specifically,
+        this happens if the shape of the subarray is not given as a tuple.
+        See http://projects.scipy.org/numpy/ticket/1766.
+        """
+        if not hasattr(dtype, 'fields') or dtype.fields is None:
+            return dtype
+
+        formats = []
+        offsets = []
+        titles = []
+        for name in dtype.names:
+            field = dtype.fields[name]
+            shape = field[0].shape
+            if not isinstance(shape, tuple):
+                shape = (shape,)
+            formats.append((field[0].base, shape))
+            offsets.append(field[1])
+
+            # There seems to be no obvious way to extract the titles from
+            # a dtype, so this just searches for duplicate fields
+            title = None
+            for key, dup in dtype.fields.items():
+                if key != name and dup == field:
+                    title = key
+                    break
+            titles.append(title)
+
+        return numpy.dtype({'names': dtype.names, 'formats': formats,
+                            'offsets': offsets, 'titles': titles})

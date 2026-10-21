@@ -1,0 +1,95 @@
+# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Methods to allow dict of numpy arrays."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import collections
+
+import numpy as np
+from six import string_types
+
+from tensorflow.python.estimator.inputs.queues import feeding_functions
+from tensorflow.python.util.tf_export import estimator_export
+
+# Key name to pack the target into dict of `features`. See
+# `_get_unique_target_key` for details.
+_TARGET_KEY = '__target_key__'
+
+
+def _validate_and_convert_features(x):
+  """Type check input data and make a shadow copy as an ordered dict.
+
+  Args:
+    x: numpy array object or dict of numpy array objects. If an array,
+      the array will be treated as a single feature.
+
+  Returns:
+    OrderedDict copy of x.
+
+  Raises:
+    ValueError: if x is empty
+    TypeError: if x is an unknown type.
+  """
+
+"""Methods to allow dict of numpy arrays."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import collections
+
+import numpy as np
+from six import string_types
+
+from tensorflow.python.estimator.inputs.queues import feeding_functions
+from tensorflow.python.util.tf_export import estimator_export
+
+_TARGET_KEY = '__target_key__'
+
+
+def _validate_and_convert_features(x):
+  """Type check input data and make a shadow copy as an ordered dict.
+
+  Args:
+    x: numpy array object or dict of numpy array objects. If an array,
+      the array will be treated as a single feature.
+
+  Returns:
+    OrderedDict copy of x.
+
+  Raises:
+    ValueError: if x is empty
+    TypeError: if x is an unknown type.
+  """  if isinstance(x, dict):
+    if not x:
+      raise ValueError('x cannot be an empty dict')
+    # Make a shadow copy and also ensure the order of iteration is consistent.
+    ordered_dict_data = collections.OrderedDict(
+        sorted(x.items(), key=lambda t: t[0]))
+  elif isinstance(x, np.ndarray):
+    if x.size == 0:
+      raise ValueError('x cannot be an empty array')
+
+    # Make a shadow copy and convert to dict to align with dict processing.
+    ordered_dict_data = collections.OrderedDict({'__direct_np_input__': x})
+  else:
+    x_type = type(x).__name__
+    raise TypeError('x must be a dict or array; got {}'.format(x_type))
+
+  return ordered_dict_data

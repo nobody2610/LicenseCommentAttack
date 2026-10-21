@@ -1,0 +1,203 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2016 Dino Occhialini <dino.occhialini@gmail.com>
+#
+# This file is part of Ansible
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+ANSIBLE_METADATA = {'metadata_version': '1.0',
+                    'status': ['preview'],
+                    'supported_by': 'community'}
+
+
+DOCUMENTATION = '''
+---
+module: xbps
+short_description: Manage packages with XBPS
+description:
+    - Manage packages with the XBPS package manager.
+author:
+    - "Dino Occhialini (@dinoocch)"
+    - "Michael Aldridge (@the-maldridge)"
+version_added: "2.3"
+options:
+    name:
+        description:
+            - Name of the package to install, upgrade, or remove.
+        required: false
+        default: null
+    state:
+        description:
+            - Desired state of the package.
+        required: false
+        default: "present"
+        choices: ["present", "absent", "latest"]
+    recurse:
+        description:
+            - When removing a package, also remove its dependencies, provided
+              that they are not required by other packages and were not
+              explicitly installed by a user.
+        required: false
+        default: no
+        choices: ["yes", "no"]
+    update_cache:
+        description:
+            - Whether or not to refresh the master package lists. This can be
+              run as part of a package installation or as a separate step.
+        required: false
+        default: yes
+        choices: ["yes", "no"]
+    upgrade:
+        description:
+            - Whether or not to upgrade whole system
+        required: false
+        default: no
+        choices: ["yes", "no"]
+'''
+
+EXAMPLES = '''
+# Install package foo
+- xbps: name=foo state=present
+# Upgrade package foo
+- xbps: name=foo state=latest update_cache=yes
+# Remove packages foo and bar
+- xbps: name=foo,bar state=absent
+# Recursively remove package foo
+- xbps: name=foo state=absent recurse=yes
+# Update package cache
+- xbps: update_cache=yes
+# Upgrade packages
+- xbps: upgrade=yes
+'''
+
+RETURN = '''
+msg:
+    description: Message about results
+    returned: success
+    type: string
+    sample: "System Upgraded"
+packages:
+    description: Packages that are affected/would be affected
+    type: list
+    sample: ["ansible"]
+'''
+
+
+import os
+
+from ansible.module_utils.basic import AnsibleModule
+
+
+def query_package(module, xbps_path, name, state="present"):
+    """Returns Package info"""
+
+
+
+ANSIBLE_METADATA = {'metadata_version': '1.0',
+                    'status': ['preview'],
+                    'supported_by': 'community'}
+
+
+DOCUMENTATION = '''
+---
+module: xbps
+short_description: Manage packages with XBPS
+description:
+    - Manage packages with the XBPS package manager.
+author:
+    - "Dino Occhialini (@dinoocch)"
+    - "Michael Aldridge (@the-maldridge)"
+version_added: "2.3"
+options:
+    name:
+        description:
+            - Name of the package to install, upgrade, or remove.
+        required: false
+        default: null
+    state:
+        description:
+            - Desired state of the package.
+        required: false
+        default: "present"
+        choices: ["present", "absent", "latest"]
+    recurse:
+        description:
+            - When removing a package, also remove its dependencies, provided
+              that they are not required by other packages and were not
+              explicitly installed by a user.
+        required: false
+        default: no
+        choices: ["yes", "no"]
+    update_cache:
+        description:
+            - Whether or not to refresh the master package lists. This can be
+              run as part of a package installation or as a separate step.
+        required: false
+        default: yes
+        choices: ["yes", "no"]
+    upgrade:
+        description:
+            - Whether or not to upgrade whole system
+        required: false
+        default: no
+        choices: ["yes", "no"]
+'''
+
+EXAMPLES = '''
+- xbps: name=foo state=present
+- xbps: name=foo state=latest update_cache=yes
+- xbps: name=foo,bar state=absent
+- xbps: name=foo state=absent recurse=yes
+- xbps: update_cache=yes
+- xbps: upgrade=yes
+'''
+
+RETURN = '''
+msg:
+    description: Message about results
+    returned: success
+    type: string
+    sample: "System Upgraded"
+packages:
+    description: Packages that are affected/would be affected
+    type: list
+    sample: ["ansible"]
+'''
+
+
+import os
+
+from ansible.module_utils.basic import AnsibleModule
+
+
+def query_package(module, xbps_path, name, state="present"):
+    """Returns Package info"""    if state == "present":
+        lcmd = "%s %s" % (xbps_path['query'], name)
+        lrc, lstdout, lstderr = module.run_command(lcmd, check_rc=False)
+        if not is_installed(lstdout):
+            # package is not installed locally
+            return False, False
+
+        rcmd = "%s -Sun" % (xbps_path['install'])
+        rrc, rstdout, rstderr = module.run_command(rcmd, check_rc=False)
+        if rrc == 0 or rrc == 17:
+            """Return True to indicate that the package is installed locally,
+            and the result of the version number comparison to determine if the
+            package is up-to-date"""
+            return True, name not in rstdout
+
+        return False, False

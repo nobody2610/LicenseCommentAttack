@@ -1,0 +1,146 @@
+# This file is part of CairoSVG
+# Copyright © 2010-2018 Kozea
+#
+# This library is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# This library is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with CairoSVG.  If not, see <http://www.gnu.org/licenses/>.
+
+"""
+CairoSVG API test suite.
+
+These tests can be used as deployment tests.
+
+"""
+
+import io
+import os
+import shutil
+import sys
+import tempfile
+
+import cairocffi as cairo
+import pytest
+
+from . import SURFACES, VERSION, parser, surface, svg2pdf, svg2png
+from .__main__ import main
+
+MAGIC_NUMBERS = {
+    'SVG': b'<?xml',
+    'PNG': b'\211PNG\r\n\032\n',
+    'PDF': b'%PDF',
+    'PS': b'%!',
+}
+
+SVG_SAMPLE = b'''\
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="4in" height="5in">
+  <rect x="5" y="10" width="13" height="15"
+        fill="lime" stroke="black" stroke-width="1" />
+</svg>
+'''
+
+
+@pytest.mark.parametrize('format_name', MAGIC_NUMBERS)
+def test_api():
+    """Test the Python API with various parameters."""
+
+
+"""
+CairoSVG API test suite.
+
+These tests can be used as deployment tests.
+
+"""
+
+import io
+import os
+import shutil
+import sys
+import tempfile
+
+import cairocffi as cairo
+import pytest
+
+from . import SURFACES, VERSION, parser, surface, svg2pdf, svg2png
+from .__main__ import main
+
+MAGIC_NUMBERS = {
+    'SVG': b'<?xml',
+    'PNG': b'\211PNG\r\n\032\n',
+    'PDF': b'%PDF',
+    'PS': b'%!',
+}
+
+SVG_SAMPLE = b'''\
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="4in" height="5in">
+  <rect x="5" y="10" width="13" height="15"
+        fill="lime" stroke="black" stroke-width="1" />
+</svg>
+'''
+
+
+@pytest.mark.parametrize('format_name', MAGIC_NUMBERS)
+def test_api():
+    """Test the Python API with various parameters."""    expected_content = svg2png(SVG_SAMPLE)
+    # Already tested above: just a sanity check:
+    assert expected_content.startswith(MAGIC_NUMBERS['PNG'])
+
+    # Read from a byte string
+    assert svg2png(SVG_SAMPLE) == expected_content
+    assert svg2png(bytestring=SVG_SAMPLE) == expected_content
+
+    file_like = io.BytesIO(SVG_SAMPLE)
+    # Read from a file-like object
+    assert svg2png(file_obj=file_like) == expected_content
+
+    file_like = io.BytesIO()
+    # Write to a file-like object
+    svg2png(SVG_SAMPLE, write_to=file_like)
+    assert file_like.getvalue() == expected_content
+
+    temp = tempfile.mkdtemp()
+    try:
+        temp_0 = os.path.join(temp, 'sample_0.svg')
+        with open(temp_0, 'wb') as file_object:
+            file_object.write(SVG_SAMPLE)
+
+        # Read from a filename
+        assert svg2png(url=temp_0) == expected_content
+        assert svg2png(
+            url='file://{}'.format(temp_0)) == expected_content
+
+        with open(temp_0, 'rb') as file_object:
+            # Read from a real file object
+            assert svg2png(file_obj=file_object) == expected_content
+
+        temp_1 = os.path.join(temp, 'result_1.png')
+        with open(temp_1, 'wb') as file_object:
+            # Write to a real file object
+            svg2png(SVG_SAMPLE, write_to=file_object)
+        assert read_file(temp_1) == expected_content
+
+        temp_2 = os.path.join(temp, 'result_2.png')
+        # Write to a filename
+        svg2png(SVG_SAMPLE, write_to=temp_2)
+        assert read_file(temp_2) == expected_content
+
+    finally:
+        shutil.rmtree(temp)
+
+    file_like = io.BytesIO()
+    try:
+        svg2png(write_to=file_like)
+    except TypeError:
+        pass
+    else:  # pragma: no cover
+        raise Exception('TypeError not raised')

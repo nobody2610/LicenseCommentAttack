@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2004-2010 Tiny SPRL (<http://tiny.be>).
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as
+#    published by the Free Software Foundation, either version 3 of the
+#    License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+import datetime
+import json
+import logging
+import select
+import time
+
+import openerp
+import openerp.tools.config
+import openerp.modules.registry
+from openerp import http
+from openerp.http import request
+from openerp.osv import osv, fields, expression
+from openerp.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
+
+_logger = logging.getLogger(__name__)
+
+def listen_channel(cr, channel_name, handle_message, check_stop=(lambda: False), check_stop_timer=60.):
+    """
+        Begin a loop, listening on a PostgreSQL channel. This method does never terminate by default, you need to provide a check_stop
+        callback to do so. This method also assume that all notifications will include a message formated using JSON (see the
+        corresponding notify_channel() method).
+
+        :param db_name: database name
+        :param channel_name: the name of the PostgreSQL channel to listen
+        :param handle_message: function that will be called when a message is received. It takes one argument, the message
+            attached to the notification.
+        :type handle_message: function (one argument)
+        :param check_stop: function that will be called periodically (see the check_stop_timer argument). If it returns True
+            this function will stop to watch the channel.
+        :type check_stop: function (no arguments)
+        :param check_stop_timer: The maximum amount of time between calls to check_stop_timer (can be shorter if messages
+            are received).
+    """
+
+import datetime
+import json
+import logging
+import select
+import time
+
+import openerp
+import openerp.tools.config
+import openerp.modules.registry
+from openerp import http
+from openerp.http import request
+from openerp.osv import osv, fields, expression
+from openerp.tools.misc import DEFAULT_SERVER_DATETIME_FORMAT
+
+_logger = logging.getLogger(__name__)
+
+def listen_channel(cr, channel_name, handle_message, check_stop=(lambda: False), check_stop_timer=60.):
+    """
+        Begin a loop, listening on a PostgreSQL channel. This method does never terminate by default, you need to provide a check_stop
+        callback to do so. This method also assume that all notifications will include a message formated using JSON (see the
+        corresponding notify_channel() method).
+
+        :param db_name: database name
+        :param channel_name: the name of the PostgreSQL channel to listen
+        :param handle_message: function that will be called when a message is received. It takes one argument, the message
+            attached to the notification.
+        :type handle_message: function (one argument)
+        :param check_stop: function that will be called periodically (see the check_stop_timer argument). If it returns True
+            this function will stop to watch the channel.
+        :type check_stop: function (no arguments)
+        :param check_stop_timer: The maximum amount of time between calls to check_stop_timer (can be shorter if messages
+            are received).
+    """    try:
+        conn = cr._cnx
+        cr.execute("listen " + channel_name + ";")
+        cr.commit();
+        stopping = False
+        while not stopping:
+            if check_stop():
+                stopping = True
+                break
+            if select.select([conn], [], [], check_stop_timer) == ([],[],[]):
+                pass
+            else:
+                conn.poll()
+                while conn.notifies:
+                    message = json.loads(conn.notifies.pop().payload)
+                    handle_message(message)
+    finally:
+        try:
+            cr.execute("unlisten " + channel_name + ";")
+            cr.commit()
+        except:
+            pass # can't do anything if that fails

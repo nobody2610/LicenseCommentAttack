@@ -1,0 +1,102 @@
+# This file is part of PRAW.
+#
+# PRAW is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# PRAW is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# PRAW.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Internal helper functions.
+
+The functions in this module are not to be relied upon by third-parties.
+
+"""
+
+from __future__ import print_function, unicode_literals
+import re
+import six
+import sys
+from requests import Request, codes, exceptions
+from requests.compat import urljoin
+from praw.decorators import restrict_access
+from praw.errors import (HTTPException, Forbidden, NotFound, InvalidSubreddit,
+                         OAuthException, OAuthInsufficientScope,
+                         OAuthInvalidToken, RedirectException)
+
+
+RE_REDIRECT = re.compile('(rand(om|nsfw))|about/sticky')
+
+
+def _modify_relationship(relationship, unlink=False, is_sub=False):
+    """Return a function for relationship modification.
+
+    Used to support friending (user-to-user), as well as moderating,
+    contributor creating, and banning (user-to-subreddit).
+
+    """
+
+
+"""Internal helper functions.
+
+The functions in this module are not to be relied upon by third-parties.
+
+"""
+
+from __future__ import print_function, unicode_literals
+import re
+import six
+import sys
+from requests import Request, codes, exceptions
+from requests.compat import urljoin
+from praw.decorators import restrict_access
+from praw.errors import (HTTPException, Forbidden, NotFound, InvalidSubreddit,
+                         OAuthException, OAuthInsufficientScope,
+                         OAuthInvalidToken, RedirectException)
+
+
+RE_REDIRECT = re.compile('(rand(om|nsfw))|about/sticky')
+
+
+def _modify_relationship(relationship, unlink=False, is_sub=False):
+    """Return a function for relationship modification.
+
+    Used to support friending (user-to-user), as well as moderating,
+    contributor creating, and banning (user-to-subreddit).
+
+    """    # The API uses friend and unfriend to manage all of these relationships.
+    url_key = 'unfriend' if unlink else 'friend'
+
+    if relationship == 'friend':
+        access = {'scope': None, 'login': True}
+    elif relationship == 'moderator':
+        access = {'scope': 'modothers'}
+    elif relationship in ['banned', 'contributor', 'muted']:
+        access = {'scope': 'modcontributors'}
+    elif relationship in ['wikibanned', 'wikicontributor']:
+        access = {'scope': ['modcontributors', 'modwiki']}
+    else:
+        access = {'scope': None, 'mod': True}
+
+    @restrict_access(**access)
+    def do_relationship(thing, user, **kwargs):
+        data = {'name': six.text_type(user),
+                'type': relationship}
+        data.update(kwargs)
+        if is_sub:
+            data['r'] = six.text_type(thing)
+        else:
+            data['container'] = thing.fullname
+
+        session = thing.reddit_session
+        if relationship == 'moderator':
+            session.evict(session.config['moderators'].format(
+                subreddit=six.text_type(thing)))
+        url = session.config[url_key]
+        return session.request_json(url, data=data)
+    return do_relationship

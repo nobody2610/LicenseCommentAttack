@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+#
+# Copyright 2015 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""HTTP wrapper for apitools.
+
+This library wraps the underlying http library we use, which is
+currently httplib2.
+"""
+
+import collections
+import contextlib
+import logging
+import socket
+import time
+
+import httplib2
+import six
+from six.moves import http_client
+from six.moves.urllib import parse
+
+from apitools.base.py import exceptions
+from apitools.base.py import util
+
+# pylint: disable=ungrouped-imports
+try:
+    from oauth2client.client import HttpAccessTokenRefreshError as TokenRefreshError  # noqa
+except ImportError:
+    from oauth2client.client import AccessTokenRefreshError as TokenRefreshError  # noqa
+
+__all__ = [
+    'CheckResponse',
+    'GetHttp',
+    'HandleExceptionsAndRebuildHttpConnections',
+    'MakeRequest',
+    'RebuildHttpConnections',
+    'Request',
+    'Response',
+    'RethrowExceptionHandler',
+]
+
+
+# 308 and 429 don't have names in httplib.
+RESUME_INCOMPLETE = 308
+TOO_MANY_REQUESTS = 429
+_REDIRECT_STATUS_CODES = (
+    http_client.MOVED_PERMANENTLY,
+    http_client.FOUND,
+    http_client.SEE_OTHER,
+    http_client.TEMPORARY_REDIRECT,
+    RESUME_INCOMPLETE,
+)
+
+# http: An httplib2.Http instance.
+# http_request: A http_wrapper.Request.
+# exc: Exception being raised.
+# num_retries: Number of retries consumed; used for exponential backoff.
+ExceptionRetryArgs = collections.namedtuple(
+    'ExceptionRetryArgs', ['http', 'http_request', 'exc', 'num_retries',
+                           'max_retry_wait', 'total_wait_sec'])
+
+
+@contextlib.contextmanager
+def _Httplib2Debuglevel(http_request, level, http=None):
+    """Temporarily change the value of httplib2.debuglevel, if necessary.
+
+    If http_request has a `loggable_body` distinct from `body`, then we
+    need to prevent httplib2 from logging the full body. This sets
+    httplib2.debuglevel for the duration of the `with` block; however,
+    that alone won't change the value of existing HTTP connections. If
+    an httplib2.Http object is provided, we'll also change the level on
+    any cached connections attached to it.
+
+    Args:
+      http_request: a Request we're logging.
+      level: (int) the debuglevel for logging.
+      http: (optional) an httplib2.Http whose connections we should
+        set the debuglevel on.
+
+    Yields:
+      None.
+    """
+
+
+"""HTTP wrapper for apitools.
+
+This library wraps the underlying http library we use, which is
+currently httplib2.
+"""
+
+import collections
+import contextlib
+import logging
+import socket
+import time
+
+import httplib2
+import six
+from six.moves import http_client
+from six.moves.urllib import parse
+
+from apitools.base.py import exceptions
+from apitools.base.py import util
+
+try:
+    from oauth2client.client import HttpAccessTokenRefreshError as TokenRefreshError  # noqa
+except ImportError:
+    from oauth2client.client import AccessTokenRefreshError as TokenRefreshError  # noqa
+
+__all__ = [
+    'CheckResponse',
+    'GetHttp',
+    'HandleExceptionsAndRebuildHttpConnections',
+    'MakeRequest',
+    'RebuildHttpConnections',
+    'Request',
+    'Response',
+    'RethrowExceptionHandler',
+]
+
+
+RESUME_INCOMPLETE = 308
+TOO_MANY_REQUESTS = 429
+_REDIRECT_STATUS_CODES = (
+    http_client.MOVED_PERMANENTLY,
+    http_client.FOUND,
+    http_client.SEE_OTHER,
+    http_client.TEMPORARY_REDIRECT,
+    RESUME_INCOMPLETE,
+)
+
+ExceptionRetryArgs = collections.namedtuple(
+    'ExceptionRetryArgs', ['http', 'http_request', 'exc', 'num_retries',
+                           'max_retry_wait', 'total_wait_sec'])
+
+
+@contextlib.contextmanager
+def _Httplib2Debuglevel(http_request, level, http=None):
+    """Temporarily change the value of httplib2.debuglevel, if necessary.
+
+    If http_request has a `loggable_body` distinct from `body`, then we
+    need to prevent httplib2 from logging the full body. This sets
+    httplib2.debuglevel for the duration of the `with` block; however,
+    that alone won't change the value of existing HTTP connections. If
+    an httplib2.Http object is provided, we'll also change the level on
+    any cached connections attached to it.
+
+    Args:
+      http_request: a Request we're logging.
+      level: (int) the debuglevel for logging.
+      http: (optional) an httplib2.Http whose connections we should
+        set the debuglevel on.
+
+    Yields:
+      None.
+    """    if http_request.loggable_body is None:
+        yield
+        return
+    old_level = httplib2.debuglevel
+    http_levels = {}
+    httplib2.debuglevel = level
+    if http is not None:
+        for connection_key, connection in http.connections.items():
+            # httplib2 stores two kinds of values in this dict, connection
+            # classes and instances. Since the connection types are all
+            # old-style classes, we can't easily distinguish by connection
+            # type -- so instead we use the key pattern.
+            if ':' not in connection_key:
+                continue
+            http_levels[connection_key] = connection.debuglevel
+            connection.set_debuglevel(level)
+    yield
+    httplib2.debuglevel = old_level
+    if http is not None:
+        for connection_key, old_level in http_levels.items():
+            if connection_key in http.connections:
+                http.connections[connection_key].set_debuglevel(old_level)

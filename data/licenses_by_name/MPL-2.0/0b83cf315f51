@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# run-tests.py -- Python harness for GDB SpiderMonkey support
+
+import os
+import re
+import subprocess
+import sys
+
+# From this directory:
+import progressbar
+from taskpool import TaskPool, get_cpu_count
+
+
+def _relpath(path, start=None):
+    # Backported from Python 3.1 posixpath.py
+
+    """Return a relative version of a path"""
+
+
+
+import os
+import re
+import subprocess
+import sys
+
+import progressbar
+from taskpool import TaskPool, get_cpu_count
+
+
+def _relpath(path, start=None):
+    # Backported from Python 3.1 posixpath.py
+
+    """Return a relative version of a path"""
+    if not path:
+        raise ValueError("no path specified")
+
+    if start is None:
+        start = os.curdir
+
+    start_list = os.path.abspath(start).split(os.sep)
+    path_list = os.path.abspath(path).split(os.sep)
+
+    # Work out how much of the filepath is shared by start and path.
+    i = len(os.path.commonprefix([start_list, path_list]))
+
+    rel_list = [os.pardir] * (len(start_list)-i) + path_list[i:]
+    if not rel_list:
+        return os.curdir
+    return os.path.join(*rel_list)

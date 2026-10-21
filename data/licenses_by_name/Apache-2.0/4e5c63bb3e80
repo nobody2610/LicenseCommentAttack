@@ -1,0 +1,169 @@
+# -*- coding: utf-8 -*-
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Code for parsing the history file, which contains counters and error
+messages for each task."""
+import json
+import re
+from logging import getLogger
+
+from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
+from .counters import _sum_counters
+from .ids import _add_implied_task_id
+from .wrap import _ls_logs
+from .wrap import _cat_log_lines
+
+
+log = getLogger(__name__)
+
+
+# what job history (e.g. counters) look like on either YARN or pre-YARN.
+# YARN uses - instead of _ to separate fields. This should work for
+# non-streaming jars as well.
+_HISTORY_LOG_PATH_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<job_id>job_\d+_\d{4})'
+    r'[_-]\d+[_-]hadoop[_-](?P<suffix>\S*)$')
+
+# escape sequence in pre-YARN history file. Characters inside COUNTERS
+# fields are double escaped
+_PRE_YARN_HISTORY_ESCAPE_RE = re.compile(r'\\(.)')
+
+# capture key-value pairs like JOBNAME="streamjob8025762403845318969\.jar"
+_PRE_YARN_HISTORY_KEY_PAIR = re.compile(
+    r'(?P<key>\w+)="(?P<escaped_value>(\\.|[^"\\])*)"', re.MULTILINE)
+
+# an entire line in a pre-YARN history file
+_PRE_YARN_HISTORY_RECORD = re.compile(
+    r'^(?P<type>\w+)'
+    r'(?P<key_pairs>( ' + _PRE_YARN_HISTORY_KEY_PAIR.pattern + ')*)'
+    r' \.$', re.MULTILINE)
+
+# capture one group of counters
+# this looks like: {(group_id)(group_name)[counter][counter]...}
+_PRE_YARN_COUNTER_GROUP_RE = re.compile(
+    r'{\('
+    r'(?P<group_id>(\\.|[^)}\\])*)'
+    r'\)\('
+    r'(?P<group_name>(\\.|[^)}\\])*)'
+    r'\)'
+    r'(?P<counter_list_str>\[(\\.|[^}\\])*\])'
+    r'}')
+
+# parse a single counter from a counter group (counter_list_str above)
+# this looks like: [(counter_id)(counter_name)(amount)]
+_PRE_YARN_COUNTER_RE = re.compile(
+    r'\[\('
+    r'(?P<counter_id>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<counter_name>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<amount>\d+)'
+    r'\)\]')
+
+
+def _interpret_history_log(fs, matches):
+    """Extract counters and errors from history log.
+
+    Matches is a list of dicts with the keys *job_id* and *yarn*
+    (see :py:func:`_ls_history_logs()`)
+
+    We expect *matches* to contain at most one match; further matches
+    will be ignored.
+
+    Returns a dictionary with the keys *counters* and *errors*.
+    """
+
+"""Code for parsing the history file, which contains counters and error
+messages for each task."""
+import json
+import re
+from logging import getLogger
+
+from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
+from .counters import _sum_counters
+from .ids import _add_implied_task_id
+from .wrap import _ls_logs
+from .wrap import _cat_log_lines
+
+
+log = getLogger(__name__)
+
+
+_HISTORY_LOG_PATH_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<job_id>job_\d+_\d{4})'
+    r'[_-]\d+[_-]hadoop[_-](?P<suffix>\S*)$')
+
+_PRE_YARN_HISTORY_ESCAPE_RE = re.compile(r'\\(.)')
+
+_PRE_YARN_HISTORY_KEY_PAIR = re.compile(
+    r'(?P<key>\w+)="(?P<escaped_value>(\\.|[^"\\])*)"', re.MULTILINE)
+
+_PRE_YARN_HISTORY_RECORD = re.compile(
+    r'^(?P<type>\w+)'
+    r'(?P<key_pairs>( ' + _PRE_YARN_HISTORY_KEY_PAIR.pattern + ')*)'
+    r' \.$', re.MULTILINE)
+
+_PRE_YARN_COUNTER_GROUP_RE = re.compile(
+    r'{\('
+    r'(?P<group_id>(\\.|[^)}\\])*)'
+    r'\)\('
+    r'(?P<group_name>(\\.|[^)}\\])*)'
+    r'\)'
+    r'(?P<counter_list_str>\[(\\.|[^}\\])*\])'
+    r'}')
+
+_PRE_YARN_COUNTER_RE = re.compile(
+    r'\[\('
+    r'(?P<counter_id>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<counter_name>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<amount>\d+)'
+    r'\)\]')
+
+
+def _interpret_history_log(fs, matches):
+    """Extract counters and errors from history log.
+
+    Matches is a list of dicts with the keys *job_id* and *yarn*
+    (see :py:func:`_ls_history_logs()`)
+
+    We expect *matches* to contain at most one match; further matches
+    will be ignored.
+
+    Returns a dictionary with the keys *counters* and *errors*.
+    """    # we expect to go through this for loop 0 or 1 times
+    for match in matches:
+        path = match['path']
+
+        if match['yarn']:
+            # not yet implemented
+            result = _parse_yarn_history_log(_cat_log_lines(fs, path))
+        else:
+            result = _parse_pre_yarn_history_log(_cat_log_lines(fs, path))
+
+        # patch path, task_id, etc. into errors
+        for error in result.get('errors') or ():
+            if 'hadoop_error' in error:
+                error['hadoop_error']['path'] = path
+            _add_implied_task_id(error)
+
+        return result
+
+    return {}

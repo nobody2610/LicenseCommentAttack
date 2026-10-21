@@ -1,0 +1,122 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Tools for working with the host system"""
+# Copyright 2012 Canonical Ltd.
+#
+# Authors:
+#  Nick Moffitt <nick.moffitt@canonical.com>
+#  Matthew Wedgwood <matthew.wedgwood@canonical.com>
+
+import os
+import re
+import pwd
+import glob
+import grp
+import random
+import string
+import subprocess
+import hashlib
+from contextlib import contextmanager
+from collections import OrderedDict
+
+import six
+
+from .hookenv import log
+from .fstab import Fstab
+
+
+def adduser(username, password=None, shell='/bin/bash', system_user=False,
+            primary_group=None, secondary_groups=None):
+    """
+    Add a user to the system.
+
+    Will log but otherwise succeed if the user already exists.
+
+    :param str username: Username to create
+    :param str password: Password for user; if ``None``, create a system user
+    :param str shell: The default shell for the user
+    :param bool system_user: Whether to create a login or system user
+    :param str primary_group: Primary group for user; defaults to their username
+    :param list secondary_groups: Optional list of additional groups
+
+    :returns: The password database entry struct, as returned by `pwd.getpwnam`
+    """
+
+
+"""Tools for working with the host system"""
+
+import os
+import re
+import pwd
+import glob
+import grp
+import random
+import string
+import subprocess
+import hashlib
+from contextlib import contextmanager
+from collections import OrderedDict
+
+import six
+
+from .hookenv import log
+from .fstab import Fstab
+
+
+def adduser(username, password=None, shell='/bin/bash', system_user=False,
+            primary_group=None, secondary_groups=None):
+    """
+    Add a user to the system.
+
+    Will log but otherwise succeed if the user already exists.
+
+    :param str username: Username to create
+    :param str password: Password for user; if ``None``, create a system user
+    :param str shell: The default shell for the user
+    :param bool system_user: Whether to create a login or system user
+    :param str primary_group: Primary group for user; defaults to their username
+    :param list secondary_groups: Optional list of additional groups
+
+    :returns: The password database entry struct, as returned by `pwd.getpwnam`
+    """    try:
+        user_info = pwd.getpwnam(username)
+        log('user {0} already exists!'.format(username))
+    except KeyError:
+        log('creating user {0}'.format(username))
+        cmd = ['useradd']
+        if system_user or password is None:
+            cmd.append('--system')
+        else:
+            cmd.extend([
+                '--create-home',
+                '--shell', shell,
+                '--password', password,
+            ])
+        if not primary_group:
+            try:
+                grp.getgrnam(username)
+                primary_group = username  # avoid "group exists" error
+            except KeyError:
+                pass
+        if primary_group:
+            cmd.extend(['-g', primary_group])
+        if secondary_groups:
+            cmd.extend(['-G', ','.join(secondary_groups)])
+        cmd.append(username)
+        subprocess.check_call(cmd)
+        user_info = pwd.getpwnam(username)
+    return user_info

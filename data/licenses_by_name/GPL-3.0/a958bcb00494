@@ -1,0 +1,153 @@
+# Copyright (c) 2009 Bea Lam. All rights reserved.
+#
+# This file is part of LightBlue.
+#
+# LightBlue is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# LightBlue is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with LightBlue.  If not, see <http://www.gnu.org/licenses/>.
+
+# Mac-specific utility functions and constants.
+
+from Foundation import NSObject, NSDate, NSPoint, NSDefaultRunLoopMode, NSTimer
+from AppKit import NSApplication, NSEvent, NSApplicationDefined, NSAnyEventMask
+import objc
+
+import time
+
+from . import _IOBluetooth
+from . import _lightbluecommon
+
+# for mac os 10.5
+try:
+    from Foundation import NSUIntegerMax
+    NSAnyEventMask = NSUIntegerMax
+except:
+    pass
+
+# values of constants used in _IOBluetooth.framework
+kIOReturnSuccess = 0       # defined in <IOKit/IOReturn.h>
+kIOBluetoothUserNotificationChannelDirectionIncoming = 1
+        # defined in <IOBluetooth/IOBluetoothUserLib.h>
+kBluetoothHCIErrorPageTimeout = 0x04   # <IOBluetooth/Bluetooth.h>
+
+# defined in <IOBluetooth/IOBluetoothUserLib.h>
+kIOBluetoothServiceBrowserControllerOptionsNone = 0
+
+
+LIGHTBLUE_NOTIFY_ID = 5444 # any old number
+WAIT_MAX_TIMEOUT = 3
+
+
+# IOBluetoothSDPUUID objects for RFCOMM and OBEX protocol UUIDs
+PROTO_UUIDS = {
+    _lightbluecommon.RFCOMM: _IOBluetooth.IOBluetoothSDPUUID.uuid16_(0x0003),
+    _lightbluecommon.OBEX: _IOBluetooth.IOBluetoothSDPUUID.uuid16_(0x0008)
+}
+
+
+def waituntil(conditionfunc, timeout=None):
+    """
+    Waits until conditionfunc() returns true, or <timeout> seconds have passed.
+    (If timeout=None, this waits indefinitely until conditionfunc() returns
+    true.) Returns false if the process timed out, otherwise returns true.
+
+    Note!! You must call interruptwait() when you know that conditionfunc()
+    should be checked (e.g. if you are waiting for data and you know some data
+    has arrived) so that this can check conditionfunc(); otherwise it will just
+    continue to wait. (This allows the function to wait for an event that is
+    sent by interruptwait() instead of polling conditionfunc().)
+
+    This allows the caller to wait while the main event loop processes its
+    events. This must be done for certain situations, e.g. to receive socket
+    data or to accept client connections on a server socket, since IOBluetooth
+    requires the presence of an event loop to run these operations.
+
+    This function doesn't need to be called if there is something else that is
+    already processing the main event loop, e.g. if called from within a Cocoa
+    application.
+    """
+
+
+
+
+from Foundation import NSObject, NSDate, NSPoint, NSDefaultRunLoopMode, NSTimer
+from AppKit import NSApplication, NSEvent, NSApplicationDefined, NSAnyEventMask
+import objc
+
+import time
+
+from . import _IOBluetooth
+from . import _lightbluecommon
+
+try:
+    from Foundation import NSUIntegerMax
+    NSAnyEventMask = NSUIntegerMax
+except:
+    pass
+
+kIOReturnSuccess = 0       # defined in <IOKit/IOReturn.h>
+kIOBluetoothUserNotificationChannelDirectionIncoming = 1
+kBluetoothHCIErrorPageTimeout = 0x04   # <IOBluetooth/Bluetooth.h>
+
+kIOBluetoothServiceBrowserControllerOptionsNone = 0
+
+
+LIGHTBLUE_NOTIFY_ID = 5444 # any old number
+WAIT_MAX_TIMEOUT = 3
+
+
+PROTO_UUIDS = {
+    _lightbluecommon.RFCOMM: _IOBluetooth.IOBluetoothSDPUUID.uuid16_(0x0003),
+    _lightbluecommon.OBEX: _IOBluetooth.IOBluetoothSDPUUID.uuid16_(0x0008)
+}
+
+
+def waituntil(conditionfunc, timeout=None):
+    """
+    Waits until conditionfunc() returns true, or <timeout> seconds have passed.
+    (If timeout=None, this waits indefinitely until conditionfunc() returns
+    true.) Returns false if the process timed out, otherwise returns true.
+
+    Note!! You must call interruptwait() when you know that conditionfunc()
+    should be checked (e.g. if you are waiting for data and you know some data
+    has arrived) so that this can check conditionfunc(); otherwise it will just
+    continue to wait. (This allows the function to wait for an event that is
+    sent by interruptwait() instead of polling conditionfunc().)
+
+    This allows the caller to wait while the main event loop processes its
+    events. This must be done for certain situations, e.g. to receive socket
+    data or to accept client connections on a server socket, since IOBluetooth
+    requires the presence of an event loop to run these operations.
+
+    This function doesn't need to be called if there is something else that is
+    already processing the main event loop, e.g. if called from within a Cocoa
+    application.
+    """    app = NSApplication.sharedApplication()
+    starttime = time.time()
+    if timeout is None:
+        timeout = NSDate.distantFuture().timeIntervalSinceNow()
+    if not isinstance(timeout, (int, float)):
+        raise TypeError("timeout must be int or float, was %s" % \
+                type(timeout))
+    endtime = starttime + timeout
+    while True:
+        currtime = time.time()
+        if currtime >= endtime:
+            return False
+        # use WAIT_MAX_TIMEOUT, don't wait forever in case of KeyboardInterrupt
+        e = app.nextEventMatchingMask_untilDate_inMode_dequeue_(NSAnyEventMask, NSDate.dateWithTimeIntervalSinceNow_(min(endtime - currtime, WAIT_MAX_TIMEOUT)), NSDefaultRunLoopMode, True)
+        if e is not None:
+            if (e.type() == NSApplicationDefined and e.subtype() == LIGHTBLUE_NOTIFY_ID):
+                if conditionfunc():
+                    return True
+            else:
+                app.postEvent_atStart_(e, True)

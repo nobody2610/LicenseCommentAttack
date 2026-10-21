@@ -1,0 +1,165 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+"""
+This module contains a number of utilities for use during
+setup/build/packaging that are useful to astropy as a whole.
+"""
+
+from __future__ import absolute_import, print_function
+
+import collections
+import os
+import re
+import subprocess
+import sys
+import traceback
+import warnings
+
+from distutils import log
+from distutils.errors import DistutilsOptionError, DistutilsModuleError
+from distutils.core import Extension
+from distutils.core import Command
+from distutils.command.sdist import sdist as DistutilsSdist
+
+from setuptools import find_packages as _find_packages
+
+from .distutils_helpers import (add_command_option, get_compiler_option,
+                                get_dummy_distribution, get_distutils_build_option,
+                                get_distutils_build_or_install_option)
+from .version_helpers import get_pkg_version_module
+from .utils import (walk_skip_hidden, import_file, extends_doc,
+                    resolve_name, AstropyDeprecationWarning)
+
+from .commands.build_ext import generate_build_ext_command
+from .commands.test import AstropyTest
+
+# These imports are not used in this module, but are included for backwards
+# compat with older versions of this module
+from .utils import get_numpy_include_path, write_if_different  # noqa
+from .commands.build_ext import should_build_with_cython, get_compiler_version  # noqa
+
+_module_state = {'registered_commands': None,
+                 'have_sphinx': False,
+                 'package_cache': None,
+                 'exclude_packages': set(),
+                 'excludes_too_late': False}
+
+try:
+    import sphinx  # noqa
+    _module_state['have_sphinx'] = True
+except ValueError as e:
+    # This can occur deep in the bowels of Sphinx's imports by way of docutils
+    # and an occurrence of this bug: http://bugs.python.org/issue18378
+    # In this case sphinx is effectively unusable
+    if 'unknown locale' in e.args[0]:
+        log.warn(
+            "Possible misconfiguration of one of the environment variables "
+            "LC_ALL, LC_CTYPES, LANG, or LANGUAGE.  For an example of how to "
+            "configure your system's language environment on OSX see "
+            "http://blog.remibergsma.com/2012/07/10/"
+            "setting-locales-correctly-on-mac-osx-terminal-application/")
+except ImportError:
+    pass
+except SyntaxError:
+    # occurs if markupsafe is recent version, which doesn't support Python 3.2
+    pass
+
+
+def get_debug_option(packagename):
+    """ Determines if the build is in debug mode.
+
+    Returns
+    -------
+    debug : bool
+        True if the current build was started with the debug option, False
+        otherwise.
+
+    """
+
+"""
+This module contains a number of utilities for use during
+setup/build/packaging that are useful to astropy as a whole.
+"""
+
+from __future__ import absolute_import, print_function
+
+import collections
+import os
+import re
+import subprocess
+import sys
+import traceback
+import warnings
+
+from distutils import log
+from distutils.errors import DistutilsOptionError, DistutilsModuleError
+from distutils.core import Extension
+from distutils.core import Command
+from distutils.command.sdist import sdist as DistutilsSdist
+
+from setuptools import find_packages as _find_packages
+
+from .distutils_helpers import (add_command_option, get_compiler_option,
+                                get_dummy_distribution, get_distutils_build_option,
+                                get_distutils_build_or_install_option)
+from .version_helpers import get_pkg_version_module
+from .utils import (walk_skip_hidden, import_file, extends_doc,
+                    resolve_name, AstropyDeprecationWarning)
+
+from .commands.build_ext import generate_build_ext_command
+from .commands.test import AstropyTest
+
+from .utils import get_numpy_include_path, write_if_different  # noqa
+from .commands.build_ext import should_build_with_cython, get_compiler_version  # noqa
+
+_module_state = {'registered_commands': None,
+                 'have_sphinx': False,
+                 'package_cache': None,
+                 'exclude_packages': set(),
+                 'excludes_too_late': False}
+
+try:
+    import sphinx  # noqa
+    _module_state['have_sphinx'] = True
+except ValueError as e:
+    if 'unknown locale' in e.args[0]:
+        log.warn(
+            "Possible misconfiguration of one of the environment variables "
+            "LC_ALL, LC_CTYPES, LANG, or LANGUAGE.  For an example of how to "
+            "configure your system's language environment on OSX see "
+            "http://blog.remibergsma.com/2012/07/10/"
+            "setting-locales-correctly-on-mac-osx-terminal-application/")
+except ImportError:
+    pass
+except SyntaxError:
+    pass
+
+
+def get_debug_option(packagename):
+    """ Determines if the build is in debug mode.
+
+    Returns
+    -------
+    debug : bool
+        True if the current build was started with the debug option, False
+        otherwise.
+
+    """
+    try:
+        current_debug = get_pkg_version_module(packagename,
+                                               fromlist=['debug'])[0]
+    except (ImportError, AttributeError):
+        current_debug = None
+
+    # Only modify the debug flag if one of the build commands was explicitly
+    # run (i.e. not as a sub-command of something else)
+    dist = get_dummy_distribution()
+    if any(cmd in dist.commands for cmd in ['build', 'build_ext']):
+        debug = bool(get_distutils_build_option('debug'))
+    else:
+        debug = bool(current_debug)
+
+    if current_debug is not None and current_debug != debug:
+        build_ext_cmd = dist.get_command_class('build_ext')
+        build_ext_cmd.force_rebuild = True
+
+    return debug

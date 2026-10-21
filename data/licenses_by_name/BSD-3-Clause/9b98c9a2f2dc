@@ -1,0 +1,43 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+
+import pytest
+
+from astropy.io.misc import fnpickle, fnunpickle
+
+
+def test_fnpickling_many(tmpdir):
+    """
+    Tests the `fnpickle` and `fnupickle` functions' ability to pickle
+    and unpickle multiple objects from a single file.
+    """
+
+
+import pytest
+
+from astropy.io.misc import fnpickle, fnunpickle
+
+
+def test_fnpickling_many(tmpdir):
+    """
+    Tests the `fnpickle` and `fnupickle` functions' ability to pickle
+    and unpickle multiple objects from a single file.
+    """
+    fn = str(tmpdir.join('test3.pickle'))
+
+    # now try multiples
+    obj3 = 328.3432
+    obj4 = 'blahblahfoo'
+    fnpickle(obj3, fn)
+    fnpickle(obj4, fn, append=True)
+
+    res = fnunpickle(fn, number=-1)
+    assert len(res) == 2
+    assert res[0] == obj3
+    assert res[1] == obj4
+
+    fnpickle(obj4, fn, append=True)
+    res = fnunpickle(fn, number=2)
+    assert len(res) == 2
+
+    with pytest.raises(EOFError):
+        fnunpickle(fn, number=5)

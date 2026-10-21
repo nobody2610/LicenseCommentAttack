@@ -1,0 +1,138 @@
+###############################################################################
+#
+# The MIT License (MIT)
+#
+# Copyright (c) Crossbar.io Technologies GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+###############################################################################
+
+
+from __future__ import absolute_import, print_function
+
+from functools import wraps
+
+from twisted.internet.interfaces import IStreamClientEndpoint
+from twisted.internet.endpoints import UNIXClientEndpoint
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.python.failure import Failure
+from twisted.internet.error import ReactorNotRunning
+
+try:
+    _TLS = True
+    from twisted.internet.endpoints import SSL4ClientEndpoint
+    from twisted.internet.ssl import optionsForClientTLS, CertificateOptions, Certificate
+    from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
+    from OpenSSL import SSL
+except ImportError:
+    _TLS = False
+    # there's no optionsForClientTLS in older Twisteds or we might be
+    # missing OpenSSL entirely.
+
+import six
+import txaio
+
+from autobahn.twisted.websocket import WampWebSocketClientFactory
+from autobahn.twisted.rawsocket import WampRawSocketClientFactory
+
+from autobahn.wamp import component
+
+from autobahn.twisted.wamp import Session
+from autobahn.wamp.serializer import create_transport_serializers, create_transport_serializer
+
+__all__ = ('Component', 'run')
+
+
+def _create_transport_factory(reactor, transport, session_factory):
+    """
+    Create a WAMP-over-XXX transport factory.
+    """
+
+
+
+from __future__ import absolute_import, print_function
+
+from functools import wraps
+
+from twisted.internet.interfaces import IStreamClientEndpoint
+from twisted.internet.endpoints import UNIXClientEndpoint
+from twisted.internet.endpoints import TCP4ClientEndpoint
+from twisted.python.failure import Failure
+from twisted.internet.error import ReactorNotRunning
+
+try:
+    _TLS = True
+    from twisted.internet.endpoints import SSL4ClientEndpoint
+    from twisted.internet.ssl import optionsForClientTLS, CertificateOptions, Certificate
+    from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
+    from OpenSSL import SSL
+except ImportError:
+    _TLS = False
+
+import six
+import txaio
+
+from autobahn.twisted.websocket import WampWebSocketClientFactory
+from autobahn.twisted.rawsocket import WampRawSocketClientFactory
+
+from autobahn.wamp import component
+
+from autobahn.twisted.wamp import Session
+from autobahn.wamp.serializer import create_transport_serializers, create_transport_serializer
+
+__all__ = ('Component', 'run')
+
+
+def _create_transport_factory(reactor, transport, session_factory):
+    """
+    Create a WAMP-over-XXX transport factory.
+    """    if transport.type == u'websocket':
+        serializers = create_transport_serializers(transport)
+        factory = WampWebSocketClientFactory(
+            session_factory,
+            url=transport.url,
+            serializers=serializers,
+            proxy=transport.proxy,  # either None or a dict with host, port
+        )
+
+    elif transport.type == u'rawsocket':
+        serializer = create_transport_serializer(transport.serializers[0])
+        factory = WampRawSocketClientFactory(session_factory, serializer=serializer)
+
+    else:
+        assert(False), 'should not arrive here'
+
+    # set the options one at a time so we can give user better feedback
+    for k, v in transport.options.items():
+        try:
+            factory.setProtocolOptions(**{k: v})
+        except (TypeError, KeyError):
+            # this allows us to document options as snake_case
+            # until everything internally is upgraded from
+            # camelCase
+            try:
+                factory.setProtocolOptions(
+                    **{_camel_case_from_snake_case(k): v}
+                )
+            except (TypeError, KeyError):
+                raise ValueError(
+                    "Unknown {} transport option: {}={}".format(transport.type, k, v)
+                )
+    return factory

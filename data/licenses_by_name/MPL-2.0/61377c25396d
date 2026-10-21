@@ -1,0 +1,137 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import absolute_import, print_function, unicode_literals
+
+import re
+import pprint
+import collections
+import voluptuous
+
+from six import text_type
+
+import taskgraph
+
+from mozbuild import schedules
+
+from .keyed_by import evaluate_keyed_by
+
+
+def resolve_keyed_by(item, field, item_name, **extra_values):
+    """
+    For values which can either accept a literal value, or be keyed by some
+    other attribute of the item, perform that lookup and replacement in-place
+    (modifying `item` directly).  The field is specified using dotted notation
+    to traverse dictionaries.
+
+    For example, given item::
+
+        job:
+            test-platform: linux128
+            chunks:
+                by-test-platform:
+                    macosx-10.11/debug: 13
+                    win.*: 6
+                    default: 12
+
+    a call to `resolve_keyed_by(item, 'job.chunks', item['thing-name'])`
+    would mutate item in-place to::
+
+        job:
+            test-platform: linux128
+            chunks: 12
+
+    The `item_name` parameter is used to generate useful error messages.
+
+    If extra_values are supplied, they represent additional values available
+    for reference from by-<field>.
+
+    Items can be nested as deeply as the schema will allow::
+
+        chunks:
+            by-test-platform:
+                win.*:
+                    by-project:
+                        ash: ..
+                        cedar: ..
+                linux: 13
+                default: 12
+    """
+
+
+from __future__ import absolute_import, print_function, unicode_literals
+
+import re
+import pprint
+import collections
+import voluptuous
+
+from six import text_type
+
+import taskgraph
+
+from mozbuild import schedules
+
+from .keyed_by import evaluate_keyed_by
+
+
+def resolve_keyed_by(item, field, item_name, **extra_values):
+    """
+    For values which can either accept a literal value, or be keyed by some
+    other attribute of the item, perform that lookup and replacement in-place
+    (modifying `item` directly).  The field is specified using dotted notation
+    to traverse dictionaries.
+
+    For example, given item::
+
+        job:
+            test-platform: linux128
+            chunks:
+                by-test-platform:
+                    macosx-10.11/debug: 13
+                    win.*: 6
+                    default: 12
+
+    a call to `resolve_keyed_by(item, 'job.chunks', item['thing-name'])`
+    would mutate item in-place to::
+
+        job:
+            test-platform: linux128
+            chunks: 12
+
+    The `item_name` parameter is used to generate useful error messages.
+
+    If extra_values are supplied, they represent additional values available
+    for reference from by-<field>.
+
+    Items can be nested as deeply as the schema will allow::
+
+        chunks:
+            by-test-platform:
+                win.*:
+                    by-project:
+                        ash: ..
+                        cedar: ..
+                linux: 13
+                default: 12
+    """    # find the field, returning the item unchanged if anything goes wrong
+    container, subfield = item, field
+    while '.' in subfield:
+        f, subfield = subfield.split('.', 1)
+        if f not in container:
+            return item
+        container = container[f]
+        if not isinstance(container, dict):
+            return item
+
+    if subfield not in container:
+        return item
+
+    container[subfield] = evaluate_keyed_by(
+        value=container[subfield],
+        item_name="`{}` in `{}`".format(field, item_name),
+        attributes=dict(item, **extra_values),
+    )
+
+    return item

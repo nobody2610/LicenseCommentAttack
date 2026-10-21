@@ -1,0 +1,87 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
+"Interactions with the Juju environment"
+# Copyright 2013 Canonical Ltd.
+#
+# Authors:
+#  Charm Helpers Developers <juju@lists.ubuntu.com>
+
+import os
+import json
+import yaml
+import subprocess
+import sys
+from subprocess import CalledProcessError
+
+import six
+if not six.PY3:
+    from UserDict import UserDict
+else:
+    from collections import UserDict
+
+CRITICAL = "CRITICAL"
+ERROR = "ERROR"
+WARNING = "WARNING"
+INFO = "INFO"
+DEBUG = "DEBUG"
+MARKER = object()
+
+cache = {}
+
+
+def relation_set(relation_id=None, relation_settings=None, **kwargs):
+    """Set relation information for the current unit"""
+
+
+"Interactions with the Juju environment"
+
+import os
+import json
+import yaml
+import subprocess
+import sys
+from subprocess import CalledProcessError
+
+import six
+if not six.PY3:
+    from UserDict import UserDict
+else:
+    from collections import UserDict
+
+CRITICAL = "CRITICAL"
+ERROR = "ERROR"
+WARNING = "WARNING"
+INFO = "INFO"
+DEBUG = "DEBUG"
+MARKER = object()
+
+cache = {}
+
+
+def relation_set(relation_id=None, relation_settings=None, **kwargs):
+    """Set relation information for the current unit"""    relation_settings = relation_settings if relation_settings else {}
+    relation_cmd_line = ['relation-set']
+    if relation_id is not None:
+        relation_cmd_line.extend(('-r', relation_id))
+    for k, v in (list(relation_settings.items()) + list(kwargs.items())):
+        if v is None:
+            relation_cmd_line.append('{}='.format(k))
+        else:
+            relation_cmd_line.append('{}={}'.format(k, v))
+    subprocess.check_call(relation_cmd_line)
+    # Flush cache of any relation-gets for local unit
+    flush(local_unit())

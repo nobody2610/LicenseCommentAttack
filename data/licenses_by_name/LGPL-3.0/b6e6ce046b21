@@ -1,0 +1,115 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+
+"""Pythonic simple SOAP Client helpers"""
+
+
+from __future__ import unicode_literals
+import sys
+if sys.version > '3':
+    basestring = unicode = str
+
+import datetime
+from decimal import Decimal
+import os
+import logging
+import hashlib
+import warnings
+
+try:
+    import urllib2
+    from urlparse import urlsplit
+except ImportError:
+    from urllib import request as urllib2
+    from urllib.parse import urlsplit
+
+from . import __author__, __copyright__, __license__, __version__
+
+
+log = logging.getLogger(__name__)
+
+
+def fetch(url, http, cache=False, force_download=False, wsdl_basedir='', headers={}):
+    """Download a document from a URL, save it locally if cache enabled"""
+
+
+"""Pythonic simple SOAP Client helpers"""
+
+
+from __future__ import unicode_literals
+import sys
+if sys.version > '3':
+    basestring = unicode = str
+
+import datetime
+from decimal import Decimal
+import os
+import logging
+import hashlib
+import warnings
+
+try:
+    import urllib2
+    from urlparse import urlsplit
+except ImportError:
+    from urllib import request as urllib2
+    from urllib.parse import urlsplit
+
+from . import __author__, __copyright__, __license__, __version__
+
+
+log = logging.getLogger(__name__)
+
+
+def fetch(url, http, cache=False, force_download=False, wsdl_basedir='', headers={}):
+    """Download a document from a URL, save it locally if cache enabled"""
+    # check / append a valid schema if not given:
+    url_scheme, netloc, path, query, fragment = urlsplit(url)
+    if not url_scheme in ('http', 'https', 'file'):
+        for scheme in ('http', 'https', 'file'):
+            try:
+                path = os.path.normpath(os.path.join(wsdl_basedir, url))
+                if not url.startswith("/") and scheme in ('http', 'https'):
+                    tmp_url = "%s://%s" % (scheme, path)
+                else:
+                    tmp_url = "%s:%s" % (scheme, path)
+                log.debug('Scheme not found, trying %s' % scheme)
+                return fetch(tmp_url, http, cache, force_download, wsdl_basedir, headers)
+            except Exception as e:
+                log.error(e)
+        raise RuntimeError('No scheme given for url: %s' % url)
+
+    # make md5 hash of the url for caching...
+    filename = '%s.xml' % hashlib.md5(url.encode('utf8')).hexdigest()
+    if isinstance(cache, basestring):
+        filename = os.path.join(cache, filename)
+    if cache and os.path.exists(filename) and not force_download:
+        log.info('Reading file %s' % filename)
+        f = open(filename, 'r')
+        xml = f.read()
+        f.close()
+    else:
+        if url_scheme == 'file':
+            log.info('Fetching url %s using urllib2' % url)
+            f = urllib2.urlopen(url)
+            xml = f.read()
+        else:
+            log.info('GET %s using %s' % (url, http._wrapper_version))
+            response, xml = http.request(url, 'GET', None, headers)
+        if cache:
+            log.info('Writing file %s' % filename)
+            if not os.path.isdir(cache):
+                os.makedirs(cache)
+            f = open(filename, 'w')
+            f.write(xml)
+            f.close()
+    return xml

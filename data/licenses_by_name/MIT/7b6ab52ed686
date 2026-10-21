@@ -1,0 +1,101 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright © Spyder Project Contributors
+# Licensed under the terms of the MIT License
+# (see spyder/__init__.py for details)
+
+"""
+Source code analysis utilities
+"""
+
+import sys
+import re
+import os
+import tempfile
+import traceback
+
+# Local import
+from spyder.config.base import _, DEBUG
+from spyder.utils import programs, encoding
+from spyder.py3compat import to_text_string, to_binary_string, PY3
+from spyder import dependencies
+DEBUG_EDITOR = DEBUG >= 3
+
+#==============================================================================
+# Pyflakes/pep8 code analysis
+#==============================================================================
+TASKS_PATTERN = r"(^|#)[ ]*(TODO|FIXME|XXX|HINT|TIP|@todo|" \
+                r"HACK|BUG|OPTIMIZE|!!!|\?\?\?)([^#]*)"
+
+#TODO: this is a test for the following function
+def check_with_pyflakes(source_code, filename=None):
+    """Check source code with pyflakes
+    Returns an empty list if pyflakes is not installed"""
+
+
+"""
+Source code analysis utilities
+"""
+
+import sys
+import re
+import os
+import tempfile
+import traceback
+
+from spyder.config.base import _, DEBUG
+from spyder.utils import programs, encoding
+from spyder.py3compat import to_text_string, to_binary_string, PY3
+from spyder import dependencies
+DEBUG_EDITOR = DEBUG >= 3
+
+TASKS_PATTERN = r"(^|#)[ ]*(TODO|FIXME|XXX|HINT|TIP|@todo|" \
+                r"HACK|BUG|OPTIMIZE|!!!|\?\?\?)([^#]*)"
+
+def check_with_pyflakes(source_code, filename=None):
+    """Check source code with pyflakes
+    Returns an empty list if pyflakes is not installed"""    try:
+        if filename is None:
+            filename = '<string>'
+        try:
+            source_code += '\n'
+        except TypeError:
+            # Python 3
+            source_code += to_binary_string('\n')
+            
+        import _ast
+        from pyflakes.checker import Checker
+        # First, compile into an AST and handle syntax errors.
+        try:
+            tree = compile(source_code, filename, "exec", _ast.PyCF_ONLY_AST)
+        except SyntaxError as value:
+            # If there's an encoding problem with the file, the text is None.
+            if value.text is None:
+                results = []
+            else:
+                results = [(value.args[0], value.lineno)]
+        except (ValueError, TypeError):
+            # Example of ValueError: file contains invalid \x escape character
+            # (see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=674797)
+            # Example of TypeError: file contains null character
+            # (see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=674796)
+            results = []
+        else:
+            # Okay, it's syntactically valid.  Now check it.
+            w = Checker(tree, filename)
+            w.messages.sort(key=lambda x: x.lineno)
+            results = []
+            coding = encoding.get_coding(source_code)
+            lines = source_code.splitlines()
+            for warning in w.messages:
+                if 'analysis:ignore' not in \
+                   to_text_string(lines[warning.lineno-1], coding):
+                    results.append((warning.message % warning.message_args,
+                                    warning.lineno))
+    except Exception:
+        # Never return None to avoid lock in spyder/widgets/editor.py
+        # See Issue 1547
+        results = []
+        if DEBUG_EDITOR:
+            traceback.print_exc()  # Print exception in internal console
+    return results

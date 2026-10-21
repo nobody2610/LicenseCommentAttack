@@ -1,0 +1,137 @@
+# (C) British Crown Copyright 2011 - 2018, Met Office
+#
+# This file is part of cartopy.
+#
+# cartopy is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cartopy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with cartopy.  If not, see <https://www.gnu.org/licenses/>.
+
+from __future__ import (absolute_import, division, print_function)
+
+import io
+import os
+import shutil
+import warnings
+
+import numpy as np
+from numpy.testing import assert_array_equal, assert_array_almost_equal
+from PIL import Image
+import pytest
+import shapely.geometry as sgeom
+from six.moves import cPickle as pickle
+
+from cartopy import config
+import cartopy.io.img_tiles as cimgt
+import cartopy.io.img_nest as cimg_nest
+
+
+#: An integer version which should be increased if the test data needs
+#: to change in some way.
+_TEST_DATA_VERSION = 1
+_TEST_DATA_DIR = os.path.join(config["data_dir"],
+                              'wmts', 'aerial')
+
+
+def wmts_data():
+    """
+    A fixture which ensures that the WMTS data is available for use in testing.
+    """
+
+
+from __future__ import (absolute_import, division, print_function)
+
+import io
+import os
+import shutil
+import warnings
+
+import numpy as np
+from numpy.testing import assert_array_equal, assert_array_almost_equal
+from PIL import Image
+import pytest
+import shapely.geometry as sgeom
+from six.moves import cPickle as pickle
+
+from cartopy import config
+import cartopy.io.img_tiles as cimgt
+import cartopy.io.img_nest as cimg_nest
+
+
+_TEST_DATA_VERSION = 1
+_TEST_DATA_DIR = os.path.join(config["data_dir"],
+                              'wmts', 'aerial')
+
+
+def wmts_data():
+    """
+    A fixture which ensures that the WMTS data is available for use in testing.
+    """    aerial = cimgt.MapQuestOpenAerial()
+
+    # get web tiles up to 3 zoom levels deep
+    tiles = [(0, 0, 0)]
+    for tile in aerial.subtiles((0, 0, 0)):
+        tiles.append(tile)
+    for tile in tiles[1:]:
+        for sub_tile in aerial.subtiles(tile):
+            tiles.append(sub_tile)
+
+    fname_template = os.path.join(_TEST_DATA_DIR, 'z_{}', 'x_{}_y_{}.png')
+
+    if not os.path.isdir(_TEST_DATA_DIR):
+        os.makedirs(_TEST_DATA_DIR)
+
+    data_version_fname = os.path.join(_TEST_DATA_DIR, 'version.txt')
+
+    test_data_version = None
+    try:
+        with open(data_version_fname, 'r') as fh:
+            test_data_version = int(fh.read().strip())
+    except IOError:
+        pass
+    finally:
+        if test_data_version != _TEST_DATA_VERSION:
+            warnings.warn('WMTS test data is out of date, regenerating at '
+                          '{}.'.format(_TEST_DATA_DIR))
+            shutil.rmtree(_TEST_DATA_DIR)
+            os.makedirs(_TEST_DATA_DIR)
+            with open(data_version_fname, 'w') as fh:
+                fh.write(str(_TEST_DATA_VERSION))
+
+    # Download the tiles.
+    for tile in tiles:
+        x, y, z = tile
+        fname = fname_template.format(z, x, y)
+        if not os.path.exists(fname):
+            if not os.path.isdir(os.path.dirname(fname)):
+                os.makedirs(os.path.dirname(fname))
+
+            img, extent, _ = aerial.get_image(tile)
+            nx, ny = 256, 256
+            x_rng = extent[1] - extent[0]
+            y_rng = extent[3] - extent[2]
+
+            pix_size_x = x_rng / nx
+            pix_size_y = y_rng / ny
+
+            upper_left_center = (extent[0] + pix_size_x / 2,
+                                 extent[2] + pix_size_y / 2)
+
+            pgw_fname = fname[:-4] + '.pgw'
+            pgw_keys = {'x_pix_size': np.float64(pix_size_x),
+                        'y_rotation': 0,
+                        'x_rotation': 0,
+                        'y_pix_size': np.float64(pix_size_y),
+                        'x_center': np.float64(upper_left_center[0]),
+                        'y_center': np.float64(upper_left_center[1]),
+                        }
+            _save_world(pgw_fname, pgw_keys)
+            img.save(fname)

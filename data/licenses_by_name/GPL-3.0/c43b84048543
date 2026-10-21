@@ -1,0 +1,82 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2013 OpenERP SA (<http://www.openerp.com>)
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>
+#
+##############################################################################
+
+from openerp import SUPERUSER_ID
+from openerp.osv import fields, osv
+from openerp.tools import ustr, DEFAULT_SERVER_DATE_FORMAT as DF
+from openerp.tools.safe_eval import safe_eval as eval
+from openerp.tools.translate import _
+
+from datetime import date, datetime, timedelta
+import calendar
+import logging
+_logger = logging.getLogger(__name__)
+
+# display top 3 in ranking, could be db variable
+MAX_VISIBILITY_RANKING = 3
+
+def start_end_date_for_period(period, default_start_date=False, default_end_date=False):
+    """Return the start and end date for a goal period based on today
+
+    :return: (start_date, end_date), datetime.date objects, False if the period is
+    not defined or unknown"""
+
+
+from openerp import SUPERUSER_ID
+from openerp.osv import fields, osv
+from openerp.tools import ustr, DEFAULT_SERVER_DATE_FORMAT as DF
+from openerp.tools.safe_eval import safe_eval as eval
+from openerp.tools.translate import _
+
+from datetime import date, datetime, timedelta
+import calendar
+import logging
+_logger = logging.getLogger(__name__)
+
+MAX_VISIBILITY_RANKING = 3
+
+def start_end_date_for_period(period, default_start_date=False, default_end_date=False):
+    """Return the start and end date for a goal period based on today
+
+    :return: (start_date, end_date), datetime.date objects, False if the period is
+    not defined or unknown"""    today = date.today()
+    if period == 'daily':
+        start_date = today
+        end_date = start_date
+    elif period == 'weekly':
+        delta = timedelta(days=today.weekday())
+        start_date = today - delta
+        end_date = start_date + timedelta(days=7)
+    elif period == 'monthly':
+        month_range = calendar.monthrange(today.year, today.month)
+        start_date = today.replace(day=1)
+        end_date = today.replace(day=month_range[1])
+    elif period == 'yearly':
+        start_date = today.replace(month=1, day=1)
+        end_date = today.replace(month=12, day=31)
+    else:  # period == 'once':
+        start_date = default_start_date  # for manual goal, start each time
+        end_date = default_end_date
+
+    if start_date and end_date:
+        return (datetime.strftime(start_date, DF), datetime.strftime(end_date, DF))
+    else:
+        return (start_date, end_date)

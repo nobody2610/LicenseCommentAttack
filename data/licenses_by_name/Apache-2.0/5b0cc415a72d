@@ -1,0 +1,75 @@
+# Copyright 2015 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
+# pylint: disable=g-short-docstring-punctuation
+"""Higher level ops for building layers."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import functools
+
+from tensorflow.contrib.layers.python.layers import initializers
+
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import nn
+from tensorflow.python.ops import standard_ops
+from tensorflow.python.ops import variable_scope
+
+
+__all__ = ['fully_connected', 'convolution2d', 'relu', 'relu6', 'linear']
+
+
+def _make_variable(name, shape, dtype, collections, initializer, regularizer):
+  """Makes a variables, adds it to collections, and applies regularization."""
+
+
+"""Higher level ops for building layers."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import functools
+
+from tensorflow.contrib.layers.python.layers import initializers
+
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import nn
+from tensorflow.python.ops import standard_ops
+from tensorflow.python.ops import variable_scope
+
+
+__all__ = ['fully_connected', 'convolution2d', 'relu', 'relu6', 'linear']
+
+
+def _make_variable(name, shape, dtype, collections, initializer, regularizer):
+  """Makes a variables, adds it to collections, and applies regularization."""
+  # We have to make sure to add w to VARIABLES, otherwise we'll get nasty
+  # surprises when trying to save or load.
+  collections = set(list(collections or []) + [ops.GraphKeys.VARIABLES])
+
+  w = variable_scope.get_variable(name,
+                                  shape=shape,
+                                  dtype=dtype,
+                                  initializer=initializer,
+                                  collections=collections)
+  if regularizer:
+    loss = regularizer(w)
+    if loss:
+      ops.add_to_collection(ops.GraphKeys.REGULARIZATION_LOSSES, loss)
+
+  return w

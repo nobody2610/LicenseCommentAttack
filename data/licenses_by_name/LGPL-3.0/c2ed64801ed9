@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2013  Rene Liebscher
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free 
+# Software Foundation; either version 3 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT 
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>. 
+#
+"""Plotting of variables, adjectives, ... using matplotlib"""
+
+__revision__ = "$Id: doc.py,v 1.15 2010-10-29 19:24:41 rliebscher Exp $"
+
+import sys
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import numpy as np
+
+# from http://bl.ocks.org/mbostock/5577023 , Set1
+colors = ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33","#a65628","#f781bf","#999999"]
+
+def getPoints(sets):
+    """Collect all important points of all adjectives in this dict of sets."""
+
+"""Plotting of variables, adjectives, ... using matplotlib"""
+
+__revision__ = "$Id: doc.py,v 1.15 2010-10-29 19:24:41 rliebscher Exp $"
+
+import sys
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import numpy as np
+
+colors = ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33","#a65628","#f781bf","#999999"]
+
+def getPoints(sets):
+    """Collect all important points of all adjectives in this dict of sets."""
+    from fuzzy.set.Set import merge
+    # merge them all
+    temp = None
+    for s in sets.values():
+        if temp is None:
+            temp = s
+        else:
+            temp = merge(max,temp,s)
+
+    # collect points
+    # >>> result of merge is always a Polygon object
+    points = [p[0] for p in temp.points]
+    # avoid to have same value twice (filter points out where successor is equal)
+    return points[:1] + [p0 for p0,p1 in zip(points[1:],points) if p0!=p1]

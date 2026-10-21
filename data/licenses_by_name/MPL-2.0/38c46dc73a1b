@@ -1,0 +1,62 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+import os, sys
+from ply import lex, yacc
+
+from ipdl.ast import *
+
+
+def p_TranslationUnit(p):
+    """TranslationUnit : Preamble NamespacedStuff"""
+
+
+import os, sys
+from ply import lex, yacc
+
+from ipdl.ast import *
+
+
+def p_TranslationUnit(p):
+    """TranslationUnit : Preamble NamespacedStuff"""
+    tu = Parser.current.tu
+    tu.loc = Loc(tu.filename)
+    for stmt in p[1]:
+        if isinstance(stmt, CxxInclude):
+            tu.addCxxInclude(stmt)
+        elif isinstance(stmt, Include):
+            tu.addInclude(stmt)
+        elif isinstance(stmt, UsingStmt):
+            tu.addUsingStmt(stmt)
+        else:
+            assert 0
+
+    for thing in p[2]:
+        if isinstance(thing, StructDecl):
+            tu.addStructDecl(thing)
+        elif isinstance(thing, UnionDecl):
+            tu.addUnionDecl(thing)
+        elif isinstance(thing, Protocol):
+            if tu.protocol is not None:
+                _error(thing.loc, "only one protocol definition per file")
+            tu.protocol = thing
+        else:
+            assert(0)
+
+    # The "canonical" namespace of the tu, what it's considered to be
+    # in for the purposes of C++: |#include "foo/bar/TU.h"|
+    if tu.protocol:
+        assert tu.filetype == 'protocol'
+        tu.namespaces = tu.protocol.namespaces
+        tu.name = tu.protocol.name
+    else:
+        assert tu.filetype == 'header'
+        # There's not really a canonical "thing" in headers.  So
+        # somewhat arbitrarily use the namespace of the last
+        # interesting thing that was declared.
+        for thing in reversed(tu.structsAndUnions):
+            tu.namespaces = thing.namespaces
+            break
+
+    p[0] = tu

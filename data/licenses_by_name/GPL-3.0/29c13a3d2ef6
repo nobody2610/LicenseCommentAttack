@@ -1,0 +1,128 @@
+# vi: ts=4 expandtab
+#
+#    Copyright (C) 2009-2010 Canonical Ltd.
+#    Copyright (C) 2012 Hewlett-Packard Development Company, L.P.
+#
+#    Author: Scott Moser <scott.moser@canonical.com>
+#    Author: Juerg Haefliger <juerg.haefliger@hp.com>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License version 3, as
+#    published by the Free Software Foundation.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import glob
+import os
+import re
+
+from cloudinit import templater
+from cloudinit import util
+
+distros = ['ubuntu', 'debian']
+
+PROXY_TPL = "Acquire::HTTP::Proxy \"%s\";\n"
+APT_CONFIG_FN = "/etc/apt/apt.conf.d/94cloud-init-config"
+APT_PROXY_FN = "/etc/apt/apt.conf.d/95cloud-init-proxy"
+
+# this will match 'XXX:YYY' (ie, 'cloud-archive:foo' or 'ppa:bar')
+ADD_APT_REPO_MATCH = r"^[\w-]+:\w"
+
+# A temporary shell program to get a given gpg key
+# from a given keyserver
+EXPORT_GPG_KEYID = """
+    k=${1} ks=${2};
+    exec 2>/dev/null
+    [ -n "$k" ] || exit 1;
+    armour=$(gpg --list-keys --armour "${k}")
+    if [ -z "${armour}" ]; then
+       gpg --keyserver ${ks} --recv $k >/dev/null &&
+          armour=$(gpg --export --armour "${k}") &&
+          gpg --batch --yes --delete-keys "${k}"
+    fi
+    [ -n "${armour}" ] && echo "${armour}"
+"""
+
+
+def find_apt_mirror_info(cloud, cfg):
+    """find an apt_mirror given the cloud and cfg provided."""
+
+
+import glob
+import os
+import re
+
+from cloudinit import templater
+from cloudinit import util
+
+distros = ['ubuntu', 'debian']
+
+PROXY_TPL = "Acquire::HTTP::Proxy \"%s\";\n"
+APT_CONFIG_FN = "/etc/apt/apt.conf.d/94cloud-init-config"
+APT_PROXY_FN = "/etc/apt/apt.conf.d/95cloud-init-proxy"
+
+ADD_APT_REPO_MATCH = r"^[\w-]+:\w"
+
+EXPORT_GPG_KEYID = """
+    k=${1} ks=${2};
+    exec 2>/dev/null
+    [ -n "$k" ] || exit 1;
+    armour=$(gpg --list-keys --armour "${k}")
+    if [ -z "${armour}" ]; then
+       gpg --keyserver ${ks} --recv $k >/dev/null &&
+          armour=$(gpg --export --armour "${k}") &&
+          gpg --batch --yes --delete-keys "${k}"
+    fi
+    [ -n "${armour}" ] && echo "${armour}"
+"""
+
+
+def find_apt_mirror_info(cloud, cfg):
+    """find an apt_mirror given the cloud and cfg provided."""
+    mirror = None
+
+    # this is less preferred way of specifying mirror preferred would be to
+    # use the distro's search or package_mirror.
+    mirror = cfg.get("apt_mirror", None)
+
+    search = cfg.get("apt_mirror_search", None)
+    if not mirror and search:
+        mirror = util.search_for_mirror(search)
+
+    if (not mirror and
+        util.get_cfg_option_bool(cfg, "apt_mirror_search_dns", False)):
+        mydom = ""
+        doms = []
+
+        # if we have a fqdn, then search its domain portion first
+        (_hostname, fqdn) = util.get_hostname_fqdn(cfg, cloud)
+        mydom = ".".join(fqdn.split(".")[1:])
+        if mydom:
+            doms.append(".%s" % mydom)
+
+        doms.extend((".localdomain", "",))
+
+        mirror_list = []
+        distro = cloud.distro.name
+        mirrorfmt = "http://%s-mirror%s/%s" % (distro, "%s", distro)
+        for post in doms:
+            mirror_list.append(mirrorfmt % (post))
+
+        mirror = util.search_for_mirror(mirror_list)
+
+    mirror_info = cloud.datasource.get_package_mirror_info()
+
+    # this is a bit strange.
+    # if mirror is set, then one of the legacy options above set it
+    # but they do not cover security. so we need to get that from
+    # get_package_mirror_info
+    if mirror:
+        mirror_info.update({'primary': mirror})
+
+    return mirror_info

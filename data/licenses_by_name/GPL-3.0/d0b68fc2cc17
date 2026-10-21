@@ -1,0 +1,115 @@
+# #START_LICENSE###########################################################
+#
+#
+# This file is part of the Environment for Tree Exploration program
+# (ETE).  http://etetoolkit.org
+#
+# ETE is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ETE is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ETE.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+#                     ABOUT THE ETE PACKAGE
+#                     =====================
+#
+# ETE is distributed under the GPL copyleft license (2008-2015).
+#
+# If you make use of ETE in published work, please cite:
+#
+# Jaime Huerta-Cepas, Joaquin Dopazo and Toni Gabaldon.
+# ETE: a python Environment for Tree Exploration. Jaime BMC
+# Bioinformatics 2010,:24doi:10.1186/1471-2105-11-24
+#
+# Note that extra references to the specific methods implemented in
+# the toolkit may be available in the documentation.
+#
+# More info at http://etetoolkit.org. Contact: huerta@embl.de
+#
+#
+# #END_LICENSE#############################################################
+
+
+"""
+This module defines the PhyloNode dataytype to manage phylogenetic
+trees. It inheritates the coretype TreeNode and add some special
+features to the the node instances.
+"""
+from __future__ import absolute_import
+from __future__ import print_function
+
+import sys
+import os
+import re
+import itertools
+from collections import defaultdict
+from .. import TreeNode, SeqGroup, NCBITaxa
+from .reconciliation import get_reconciled_tree
+from . import spoverlap
+
+__all__ = ["PhyloNode", "PhyloTree"]
+
+def iter_sptrees(sptrees, nid2node, features=None, newick_only=False):
+    """ Loads and map the species trees returned by get_subtrees"""
+
+
+
+"""
+This module defines the PhyloNode dataytype to manage phylogenetic
+trees. It inheritates the coretype TreeNode and add some special
+features to the the node instances.
+"""
+from __future__ import absolute_import
+from __future__ import print_function
+
+import sys
+import os
+import re
+import itertools
+from collections import defaultdict
+from .. import TreeNode, SeqGroup, NCBITaxa
+from .reconciliation import get_reconciled_tree
+from . import spoverlap
+
+__all__ = ["PhyloNode", "PhyloTree"]
+
+def iter_sptrees(sptrees, nid2node, features=None, newick_only=False):
+    """ Loads and map the species trees returned by get_subtrees"""
+    features = set(features) if features else set()
+    features.update(["name"])
+
+    def _nodereplacer(match):
+        pre, b, post =  match.groups()
+        node = nid2node[int(b)]
+        fstring = ""
+        if features:
+            fstring = "".join(["[&&NHX:",
+                               ','.join(["%s=%s" %(f, getattr(node, f))
+                                         for f in features if hasattr(node, f)])
+                               , "]"])
+
+        return ''.join([pre, node.name, fstring, post])
+
+    if newick_only:
+        id_match = re.compile("([^0-9])(\d+)([^0-9])")
+        for nw in sptrees:
+            yield re.sub(id_match, _nodereplacer, str(nw)+";")
+    else:
+        for nw in sptrees:
+            # I take advantage from the fact that I generated the subtrees
+            # using tuples, so str representation is actually a newick :)
+            t = PhyloTree(str(nw)+";")
+            # Map features from original tree
+            for leaf in t.iter_leaves():
+                _nid = int(leaf.name)
+                for f in features:
+                    leaf.add_feature(f, getattr(nid2node[_nid], f))
+            yield t

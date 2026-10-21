@@ -1,0 +1,189 @@
+# Copyright (C) 2014-2018 H. Turgut Uyar <uyar@tekir.org>
+#
+# Piculet is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Piculet is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Piculet.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Piculet is a module for scraping XML and HTML documents using XPath queries.
+
+It consists of this single source file with no dependencies other than
+the standard library, which makes it very easy to integrate into applications.
+It has been tested with Python 2.7, Python 3.4+, PyPy2 5.7+, and PyPy3 5.7+.
+
+For more information, please refer to the documentation:
+https://piculet.readthedocs.io/
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import json
+import logging
+import os
+import re
+import sys
+from argparse import ArgumentParser
+from collections import deque
+from functools import partial
+from operator import itemgetter
+from pkgutil import find_loader
+
+
+PY2 = sys.version_info < (3, 0)
+
+
+if PY2:
+    str, bytes = unicode, str
+
+
+if PY2:
+    from cgi import escape as html_escape
+    from HTMLParser import HTMLParser
+    from StringIO import StringIO
+    from htmlentitydefs import name2codepoint
+    from urllib2 import urlopen
+else:
+    from html import escape as html_escape
+    from html.parser import HTMLParser
+    from io import StringIO
+    from urllib.request import urlopen
+
+
+if PY2:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def redirect_stdout(new_stdout):
+        """Context manager for temporarily redirecting stdout."""
+        old_stdout, sys.stdout = sys.stdout, new_stdout
+        try:
+            yield new_stdout
+        finally:
+            sys.stdout = old_stdout
+else:
+    from contextlib import redirect_stdout
+
+
+_logger = logging.getLogger(__name__)
+
+
+###########################################################
+# HTML OPERATIONS
+###########################################################
+
+
+# TODO: this is too fragile
+_CHARSET_TAGS = [
+    b'<meta http-equiv="content-type" content="text/html; charset=',
+    b'<meta charset="'
+]
+
+
+def remove_elements(root, path):
+    """Remove selected elements from the tree.
+
+    :sig: (Element, str) -> None
+    :param root: Root element of the tree.
+    :param path: XPath to select the elements to remove.
+    """
+
+
+"""Piculet is a module for scraping XML and HTML documents using XPath queries.
+
+It consists of this single source file with no dependencies other than
+the standard library, which makes it very easy to integrate into applications.
+It has been tested with Python 2.7, Python 3.4+, PyPy2 5.7+, and PyPy3 5.7+.
+
+For more information, please refer to the documentation:
+https://piculet.readthedocs.io/
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+import json
+import logging
+import os
+import re
+import sys
+from argparse import ArgumentParser
+from collections import deque
+from functools import partial
+from operator import itemgetter
+from pkgutil import find_loader
+
+
+PY2 = sys.version_info < (3, 0)
+
+
+if PY2:
+    str, bytes = unicode, str
+
+
+if PY2:
+    from cgi import escape as html_escape
+    from HTMLParser import HTMLParser
+    from StringIO import StringIO
+    from htmlentitydefs import name2codepoint
+    from urllib2 import urlopen
+else:
+    from html import escape as html_escape
+    from html.parser import HTMLParser
+    from io import StringIO
+    from urllib.request import urlopen
+
+
+if PY2:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def redirect_stdout(new_stdout):
+        """Context manager for temporarily redirecting stdout."""
+        old_stdout, sys.stdout = sys.stdout, new_stdout
+        try:
+            yield new_stdout
+        finally:
+            sys.stdout = old_stdout
+else:
+    from contextlib import redirect_stdout
+
+
+_logger = logging.getLogger(__name__)
+
+
+
+
+_CHARSET_TAGS = [
+    b'<meta http-equiv="content-type" content="text/html; charset=',
+    b'<meta charset="'
+]
+
+
+def remove_elements(root, path):
+    """Remove selected elements from the tree.
+
+    :sig: (Element, str) -> None
+    :param root: Root element of the tree.
+    :param path: XPath to select the elements to remove.
+    """    if _USE_LXML:
+        get_parent = ElementTree._Element.getparent
+    else:
+        # ElementTree doesn't support parent queries, so we'll build a map for it
+        get_parent = root.attrib.get('_get_parent')
+        if get_parent is None:
+            get_parent = {e: p for p in root.iter() for e in p}.get
+            root.attrib['_get_parent'] = get_parent
+    elements = XPath(path)(root)
+    _logger.debug('removing %s elements using path: "%s"', len(elements), path)
+    if len(elements) > 0:
+        for element in elements:
+            _logger.debug('removing element: "%s"', element.tag)
+            # XXX: could this be hazardous? parent removed in earlier iteration?
+            get_parent(element).remove(element)

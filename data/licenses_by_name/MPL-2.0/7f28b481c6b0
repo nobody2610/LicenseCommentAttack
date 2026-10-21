@@ -1,0 +1,165 @@
+#!/usr/bin/env python
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this file,
+# You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import absolute_import, print_function
+
+import os
+import mozinfo
+from collections import namedtuple
+from distutils.spawn import find_executable
+from subprocess import check_output
+
+__all__ = ['get_debugger_info',
+           'get_default_debugger_name',
+           'DebuggerSearch',
+           'get_default_valgrind_args']
+
+'''
+Map of debugging programs to information about them, like default arguments
+and whether or not they are interactive.
+
+To add support for a new debugger, simply add the relative entry in
+_DEBUGGER_INFO and optionally update the _DEBUGGER_PRIORITIES.
+'''
+_DEBUGGER_INFO = {
+    # gdb requires that you supply the '--args' flag in order to pass arguments
+    # after the executable name to the executable.
+    'gdb': {
+        'interactive': True,
+        'args': ['-q', '--args']
+    },
+
+    'cgdb': {
+        'interactive': True,
+        'args': ['-q', '--args']
+    },
+
+    'lldb': {
+        'interactive': True,
+        'args': ['--'],
+        'requiresEscapedArgs': True
+    },
+
+    # Visual Studio Debugger Support.
+    'devenv.exe': {
+        'interactive': True,
+        'args': ['-debugexe']
+    },
+
+    # Visual C++ Express Debugger Support.
+    'wdexpress.exe': {
+        'interactive': True,
+        'args': ['-debugexe']
+    },
+
+    # Windows Development Kit super-debugger.
+    'windbg.exe': {
+        'interactive': True,
+    },
+}
+
+# Maps each OS platform to the preferred debugger programs found in _DEBUGGER_INFO.
+_DEBUGGER_PRIORITIES = {
+    'win': ['devenv.exe', 'wdexpress.exe'],
+    'linux': ['gdb', 'cgdb', 'lldb'],
+    'mac': ['lldb', 'gdb'],
+    'android': ['gdb'],
+    'unknown': ['gdb']
+}
+
+
+def get_debugger_path(debugger):
+    '''
+    Get the full path of the debugger.
+
+    :param debugger: The name of the debugger.
+    '''
+
+
+
+from __future__ import absolute_import, print_function
+
+import os
+import mozinfo
+from collections import namedtuple
+from distutils.spawn import find_executable
+from subprocess import check_output
+
+__all__ = ['get_debugger_info',
+           'get_default_debugger_name',
+           'DebuggerSearch',
+           'get_default_valgrind_args']
+
+'''
+Map of debugging programs to information about them, like default arguments
+and whether or not they are interactive.
+
+To add support for a new debugger, simply add the relative entry in
+_DEBUGGER_INFO and optionally update the _DEBUGGER_PRIORITIES.
+'''
+_DEBUGGER_INFO = {
+    'gdb': {
+        'interactive': True,
+        'args': ['-q', '--args']
+    },
+
+    'cgdb': {
+        'interactive': True,
+        'args': ['-q', '--args']
+    },
+
+    'lldb': {
+        'interactive': True,
+        'args': ['--'],
+        'requiresEscapedArgs': True
+    },
+
+    'devenv.exe': {
+        'interactive': True,
+        'args': ['-debugexe']
+    },
+
+    'wdexpress.exe': {
+        'interactive': True,
+        'args': ['-debugexe']
+    },
+
+    'windbg.exe': {
+        'interactive': True,
+    },
+}
+
+_DEBUGGER_PRIORITIES = {
+    'win': ['devenv.exe', 'wdexpress.exe'],
+    'linux': ['gdb', 'cgdb', 'lldb'],
+    'mac': ['lldb', 'gdb'],
+    'android': ['gdb'],
+    'unknown': ['gdb']
+}
+
+
+def get_debugger_path(debugger):
+    '''
+    Get the full path of the debugger.
+
+    :param debugger: The name of the debugger.
+    '''
+    if mozinfo.os == 'mac' and debugger == 'lldb':
+        # On newer OSX versions System Integrity Protections prevents us from
+        # setting certain env vars for a process such as DYLD_LIBRARY_PATH if
+        # it's in a protected directory such as /usr/bin. This is the case for
+        # lldb, so we try to find an instance under the Xcode install instead.
+
+        # Attempt to use the xcrun util to find the path.
+        try:
+            path = check_output(['xcrun', '--find', 'lldb']).strip()
+            if path:
+                return path
+        except Exception:
+            # Just default to find_executable instead.
+            pass
+
+    return find_executable(debugger)

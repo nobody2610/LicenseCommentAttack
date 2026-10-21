@@ -1,0 +1,192 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import print_function, unicode_literals
+
+import json
+import os
+import platform
+import sys
+import types
+
+
+SEARCH_PATHS = [
+    'marionette/client',
+    'marionette/harness',
+    'mochitest',
+    'mozbase/manifestparser',
+    'mozbase/mozcrash',
+    'mozbase/mozdebug',
+    'mozbase/mozdevice',
+    'mozbase/mozfile',
+    'mozbase/mozhttpd',
+    'mozbase/mozinfo',
+    'mozbase/mozinstall',
+    'mozbase/mozleak',
+    'mozbase/mozlog',
+    'mozbase/moznetwork',
+    'mozbase/mozprocess',
+    'mozbase/mozprofile',
+    'mozbase/mozrunner',
+    'mozbase/mozscreenshot',
+    'mozbase/mozsystemmonitor',
+    'mozbase/moztest',
+    'mozbase/mozversion',
+    'reftest',
+    'tools/mach',
+    'tools/mozterm',
+    'tools/six',
+    'tools/wptserve',
+    'web-platform',
+    'web-platform/tests/tools/wptrunner',
+    'xpcshell',
+]
+
+# Individual files providing mach commands.
+MACH_MODULES = [
+    'marionette/mach_test_package_commands.py',
+    'mochitest/mach_test_package_commands.py',
+    'reftest/mach_test_package_commands.py',
+    'tools/mach/mach/commands/commandinfo.py',
+    'web-platform/mach_test_package_commands.py',
+    'xpcshell/mach_test_package_commands.py',
+]
+
+
+CATEGORIES = {
+    'testing': {
+        'short': 'Testing',
+        'long': 'Run tests.',
+        'priority': 30,
+    },
+    'devenv': {
+        'short': 'Development Environment',
+        'long': 'Set up and configure your development environment.',
+        'priority': 20,
+    },
+    'misc': {
+        'short': 'Potpourri',
+        'long': 'Potent potables and assorted snacks.',
+        'priority': 10,
+    },
+    'disabled': {
+        'short': 'Disabled',
+        'long': 'The disabled commands are hidden by default. Use -v to display them. '
+                'These commands are unavailable for your current context, '
+                'run "mach <command>" to see why.',
+        'priority': 0,
+    }
+}
+
+
+IS_WIN = sys.platform in ('win32', 'cygwin')
+
+
+def activate_mozharness_venv(context):
+    """Activate the mozharness virtualenv in-process."""
+
+
+from __future__ import print_function, unicode_literals
+
+import json
+import os
+import platform
+import sys
+import types
+
+
+SEARCH_PATHS = [
+    'marionette/client',
+    'marionette/harness',
+    'mochitest',
+    'mozbase/manifestparser',
+    'mozbase/mozcrash',
+    'mozbase/mozdebug',
+    'mozbase/mozdevice',
+    'mozbase/mozfile',
+    'mozbase/mozhttpd',
+    'mozbase/mozinfo',
+    'mozbase/mozinstall',
+    'mozbase/mozleak',
+    'mozbase/mozlog',
+    'mozbase/moznetwork',
+    'mozbase/mozprocess',
+    'mozbase/mozprofile',
+    'mozbase/mozrunner',
+    'mozbase/mozscreenshot',
+    'mozbase/mozsystemmonitor',
+    'mozbase/moztest',
+    'mozbase/mozversion',
+    'reftest',
+    'tools/mach',
+    'tools/mozterm',
+    'tools/six',
+    'tools/wptserve',
+    'web-platform',
+    'web-platform/tests/tools/wptrunner',
+    'xpcshell',
+]
+
+MACH_MODULES = [
+    'marionette/mach_test_package_commands.py',
+    'mochitest/mach_test_package_commands.py',
+    'reftest/mach_test_package_commands.py',
+    'tools/mach/mach/commands/commandinfo.py',
+    'web-platform/mach_test_package_commands.py',
+    'xpcshell/mach_test_package_commands.py',
+]
+
+
+CATEGORIES = {
+    'testing': {
+        'short': 'Testing',
+        'long': 'Run tests.',
+        'priority': 30,
+    },
+    'devenv': {
+        'short': 'Development Environment',
+        'long': 'Set up and configure your development environment.',
+        'priority': 20,
+    },
+    'misc': {
+        'short': 'Potpourri',
+        'long': 'Potent potables and assorted snacks.',
+        'priority': 10,
+    },
+    'disabled': {
+        'short': 'Disabled',
+        'long': 'The disabled commands are hidden by default. Use -v to display them. '
+                'These commands are unavailable for your current context, '
+                'run "mach <command>" to see why.',
+        'priority': 0,
+    }
+}
+
+
+IS_WIN = sys.platform in ('win32', 'cygwin')
+
+
+def activate_mozharness_venv(context):
+    """Activate the mozharness virtualenv in-process."""    venv = os.path.join(context.mozharness_workdir,
+                        context.mozharness_config.get('virtualenv_path', 'venv'))
+
+    if not os.path.isdir(venv):
+        print("No mozharness virtualenv detected at '{}'.".format(venv))
+        return 1
+
+    venv_bin = os.path.join(venv, 'Scripts' if IS_WIN else 'bin')
+    activate_path = os.path.join(venv_bin, 'activate_this.py')
+
+    execfile(activate_path, dict(__file__=activate_path))
+
+    if isinstance(os.environ['PATH'], unicode):
+        os.environ['PATH'] = os.environ['PATH'].encode('utf-8')
+
+    # sys.executable is used by mochitest-media to start the websocketprocessbridge,
+    # for some reason it doesn't get set when calling `activate_this.py` so set it
+    # here instead.
+    binary = 'python'
+    if IS_WIN:
+        binary += '.exe'
+    sys.executable = os.path.join(venv_bin, binary)

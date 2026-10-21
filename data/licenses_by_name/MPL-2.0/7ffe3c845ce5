@@ -1,0 +1,82 @@
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import with_statement
+import logging
+from operator import itemgetter
+import os
+import platform
+import re
+import signal
+import subprocess
+import sys
+import tempfile
+import mozinfo
+
+__all__ = [
+  "dumpLeakLog",
+  "processLeakLog",
+  'systemMemory',
+  'environment',
+  'dumpScreen',
+  "ShutdownLeaks",
+  "setAutomationLog",
+  ]
+
+log = logging.getLogger()
+
+def dumpLeakLog(leakLogFile, filter = False):
+  """Process the leak log, without parsing it.
+
+  Use this function if you want the raw log only.
+  Use it preferably with the |XPCOM_MEM_LEAK_LOG| environment variable.
+  """
+
+
+from __future__ import with_statement
+import logging
+from operator import itemgetter
+import os
+import platform
+import re
+import signal
+import subprocess
+import sys
+import tempfile
+import mozinfo
+
+__all__ = [
+  "dumpLeakLog",
+  "processLeakLog",
+  'systemMemory',
+  'environment',
+  'dumpScreen',
+  "ShutdownLeaks",
+  "setAutomationLog",
+  ]
+
+log = logging.getLogger()
+
+def dumpLeakLog(leakLogFile, filter = False):
+  """Process the leak log, without parsing it.
+
+  Use this function if you want the raw log only.
+  Use it preferably with the |XPCOM_MEM_LEAK_LOG| environment variable.
+  """
+
+  # Don't warn (nor "info") if the log file is not there.
+  if not os.path.exists(leakLogFile):
+    return
+
+  with open(leakLogFile, "r") as leaks:
+    leakReport = leaks.read()
+
+  # Only |XPCOM_MEM_LEAK_LOG| reports can be actually filtered out.
+  # Only check whether an actual leak was reported.
+  if filter and not "0 TOTAL " in leakReport:
+    return
+
+  # Simply copy the log.
+  log.info(leakReport.rstrip("\n"))

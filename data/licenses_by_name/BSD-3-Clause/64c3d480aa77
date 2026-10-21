@@ -1,0 +1,196 @@
+# cmd.py
+# Copyright (C) 2008, 2009 Michael Trier (mtrier@gmail.com) and contributors
+#
+# This module is part of GitPython and is released under
+# the BSD License: http://www.opensource.org/licenses/bsd-license.php
+
+from contextlib import contextmanager
+import io
+import logging
+import os
+import signal
+from subprocess import (
+    call,
+    Popen,
+    PIPE
+)
+import subprocess
+import sys
+import threading
+from collections import OrderedDict
+from textwrap import dedent
+
+from git.compat import (
+    string_types,
+    defenc,
+    force_bytes,
+    PY3,
+    # just to satisfy flake8 on py3
+    unicode,
+    safe_decode,
+    is_posix,
+    is_win,
+)
+from git.exc import CommandError
+from git.util import is_cygwin_git, cygpath, expand_path
+
+from .exc import (
+    GitCommandError,
+    GitCommandNotFound
+)
+from .util import (
+    LazyMixin,
+    stream_copy,
+)
+
+try:
+    PermissionError
+except NameError:  # Python < 3.3
+    PermissionError = OSError
+
+execute_kwargs = {'istream', 'with_extended_output',
+                  'with_exceptions', 'as_process', 'stdout_as_string',
+                  'output_stream', 'with_stdout', 'kill_after_timeout',
+                  'universal_newlines', 'shell', 'env', 'max_chunk_size'}
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
+
+__all__ = ('Git',)
+
+
+# ==============================================================================
+## @name Utilities
+# ------------------------------------------------------------------------------
+# Documentation
+## @{
+
+def handle_process_output(process, stdout_handler, stderr_handler,
+                          finalizer=None, decode_streams=True):
+    """Registers for notifications to lean that process output is ready to read, and dispatches lines to
+    the respective line handlers.
+    This function returns once the finalizer returns
+
+    :return: result of finalizer
+    :param process: subprocess.Popen instance
+    :param stdout_handler: f(stdout_line_string), or None
+    :param stderr_handler: f(stderr_line_string), or None
+    :param finalizer: f(proc) - wait for proc to finish
+    :param decode_streams:
+        Assume stdout/stderr streams are binary and decode them before pushing \
+        their contents to handlers.
+        Set it to False if `universal_newline == True` (then streams are in text-mode)
+        or if decoding must happen later (i.e. for Diffs).
+
+
+from contextlib import contextmanager
+import io
+import logging
+import os
+import signal
+from subprocess import (
+    call,
+    Popen,
+    PIPE
+)
+import subprocess
+import sys
+import threading
+from collections import OrderedDict
+from textwrap import dedent
+
+from git.compat import (
+    string_types,
+    defenc,
+    force_bytes,
+    PY3,
+    unicode,
+    safe_decode,
+    is_posix,
+    is_win,
+)
+from git.exc import CommandError
+from git.util import is_cygwin_git, cygpath, expand_path
+
+from .exc import (
+    GitCommandError,
+    GitCommandNotFound
+)
+from .util import (
+    LazyMixin,
+    stream_copy,
+)
+
+try:
+    PermissionError
+except NameError:  # Python < 3.3
+    PermissionError = OSError
+
+execute_kwargs = {'istream', 'with_extended_output',
+                  'with_exceptions', 'as_process', 'stdout_as_string',
+                  'output_stream', 'with_stdout', 'kill_after_timeout',
+                  'universal_newlines', 'shell', 'env', 'max_chunk_size'}
+
+log = logging.getLogger(__name__)
+log.addHandler(logging.NullHandler())
+
+__all__ = ('Git',)
+
+
+
+def handle_process_output(process, stdout_handler, stderr_handler,
+                          finalizer=None, decode_streams=True):
+    """Registers for notifications to lean that process output is ready to read, and dispatches lines to
+    the respective line handlers.
+    This function returns once the finalizer returns
+
+    :return: result of finalizer
+    :param process: subprocess.Popen instance
+    :param stdout_handler: f(stdout_line_string), or None
+    :param stderr_handler: f(stderr_line_string), or None
+    :param finalizer: f(proc) - wait for proc to finish
+    :param decode_streams:
+        Assume stdout/stderr streams are binary and decode them before pushing \
+        their contents to handlers.
+        Set it to False if `universal_newline == True` (then streams are in text-mode)
+        or if decoding must happen later (i.e. for Diffs).    """
+    # Use 2 "pump" threads and wait for both to finish.
+    def pump_stream(cmdline, name, stream, is_decode, handler):
+        try:
+            for line in stream:
+                if handler:
+                    if is_decode:
+                        line = line.decode(defenc)
+                    handler(line)
+        except Exception as ex:
+            log.error("Pumping %r of cmd(%s) failed due to: %r", name, cmdline, ex)
+            raise CommandError(['<%s-pump>' % name] + cmdline, ex)
+        finally:
+            stream.close()
+
+    cmdline = getattr(process, 'args', '')  # PY3+ only
+    if not isinstance(cmdline, (tuple, list)):
+        cmdline = cmdline.split()
+
+    pumps = []
+    if process.stdout:
+        pumps.append(('stdout', process.stdout, stdout_handler))
+    if process.stderr:
+        pumps.append(('stderr', process.stderr, stderr_handler))
+
+    threads = []
+
+    for name, stream, handler in pumps:
+        t = threading.Thread(target=pump_stream,
+                             args=(cmdline, name, stream, decode_streams, handler))
+        t.setDaemon(True)
+        t.start()
+        threads.append(t)
+
+    ## FIXME: Why Join??  Will block if `stdin` needs feeding...
+    #
+    for t in threads:
+        t.join()
+
+    if finalizer:
+        return finalizer(process)

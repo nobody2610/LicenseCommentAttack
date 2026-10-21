@@ -1,0 +1,94 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+
+"""
+Miscellaneous utilities for `astropy.units`.
+
+None of the functions in the module are meant for use outside of the
+package.
+"""
+
+
+import numbers
+import io
+import re
+from fractions import Fraction
+
+import numpy as np
+from numpy import finfo
+
+
+_float_finfo = finfo(float)
+# take float here to ensure comparison with another float is fast
+# give a little margin since often multiple calculations happened
+_JUST_BELOW_UNITY = float(1.-4.*_float_finfo.epsneg)
+_JUST_ABOVE_UNITY = float(1.+4.*_float_finfo.eps)
+
+
+def _iter_unit_summary(namespace):
+    """
+    Generates the ``(unit, doc, represents, aliases, prefixes)``
+    tuple used to format the unit summary docs in `generate_unit_summary`.
+    """
+
+
+"""
+Miscellaneous utilities for `astropy.units`.
+
+None of the functions in the module are meant for use outside of the
+package.
+"""
+
+
+import numbers
+import io
+import re
+from fractions import Fraction
+
+import numpy as np
+from numpy import finfo
+
+
+_float_finfo = finfo(float)
+_JUST_BELOW_UNITY = float(1.-4.*_float_finfo.epsneg)
+_JUST_ABOVE_UNITY = float(1.+4.*_float_finfo.eps)
+
+
+def _iter_unit_summary(namespace):
+    """
+    Generates the ``(unit, doc, represents, aliases, prefixes)``
+    tuple used to format the unit summary docs in `generate_unit_summary`.
+    """
+    from . import core
+
+    # Get all of the units, and keep track of which ones have SI
+    # prefixes
+    units = []
+    has_prefixes = set()
+    for key, val in namespace.items():
+        # Skip non-unit items
+        if not isinstance(val, core.UnitBase):
+            continue
+
+        # Skip aliases
+        if key != val.name:
+            continue
+
+        if isinstance(val, core.PrefixUnit):
+            # This will return the root unit that is scaled by the prefix
+            # attached to it
+            has_prefixes.add(val._represents.bases[0].name)
+        else:
+            units.append(val)
+
+    # Sort alphabetically, case insensitive
+    units.sort(key=lambda x: x.name.lower())
+
+    for unit in units:
+        doc = _get_first_sentence(unit.__doc__).strip()
+        represents = ''
+        if isinstance(unit, core.Unit):
+            represents = ":math:`{0}`".format(
+                unit._represents.to_string('latex')[1:-1])
+        aliases = ', '.join('``{0}``'.format(x) for x in unit.aliases)
+
+        yield (unit, doc, represents, aliases, 'Yes' if unit.name in has_prefixes else 'No')

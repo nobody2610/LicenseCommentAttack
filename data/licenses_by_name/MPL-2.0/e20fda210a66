@@ -1,0 +1,91 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+from __future__ import absolute_import, print_function
+
+from distutils.spawn import find_executable
+from distutils.version import LooseVersion
+import json
+import os
+import platform
+import shutil
+import subprocess
+from subprocess import PIPE
+
+import servo.packages as packages
+from servo.util import extract, download_file, host_triple
+
+
+def windows_msvc(context, force=False):
+    '''Bootstrapper for MSVC building on Windows.'''
+
+
+from __future__ import absolute_import, print_function
+
+from distutils.spawn import find_executable
+from distutils.version import LooseVersion
+import json
+import os
+import platform
+import shutil
+import subprocess
+from subprocess import PIPE
+
+import servo.packages as packages
+from servo.util import extract, download_file, host_triple
+
+
+def windows_msvc(context, force=False):
+    '''Bootstrapper for MSVC building on Windows.'''
+    deps_dir = os.path.join(context.sharedir, "msvc-dependencies")
+    deps_url = "https://servo-deps.s3.amazonaws.com/msvc-deps/"
+
+    def version(package):
+        return packages.WINDOWS_MSVC[package]
+
+    def package_dir(package):
+        return os.path.join(deps_dir, package, version(package))
+
+    def check_cmake(version):
+        cmake_path = find_executable("cmake")
+        if cmake_path:
+            cmake = subprocess.Popen([cmake_path, "--version"], stdout=PIPE)
+            cmake_version = cmake.stdout.read().splitlines()[0].replace("cmake version ", "")
+            if LooseVersion(cmake_version) >= LooseVersion(version):
+                return True
+        return False
+
+    to_install = {}
+    for package in packages.WINDOWS_MSVC:
+        # Don't install CMake if it already exists in PATH
+        if package == "cmake" and check_cmake(version("cmake")):
+            continue
+
+        if not os.path.isdir(package_dir(package)):
+            to_install[package] = version(package)
+
+    if not to_install:
+        return 0
+
+    print("Installing missing MSVC dependencies...")
+    for package in to_install:
+        full_spec = '{}-{}'.format(package, version(package))
+
+        parent_dir = os.path.dirname(package_dir(package))
+        if not os.path.isdir(parent_dir):
+            os.makedirs(parent_dir)
+
+        zip_path = package_dir(package) + ".zip"
+        if not os.path.isfile(zip_path):
+            zip_url = "{}{}.zip".format(deps_url, full_spec)
+            download_file(full_spec, zip_url, zip_path)
+
+        print("Extracting {}...".format(full_spec), end='')
+        extract(zip_path, deps_dir)
+        print("done")
+
+        extracted_path = os.path.join(deps_dir, full_spec)
+        os.rename(extracted_path, package_dir(package))
+
+    return 0

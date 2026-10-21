@@ -1,0 +1,98 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2004-2009 Tiny SPRL (<http://tiny.be>).
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as
+#    published by the Free Software Foundation, either version 3 of the
+#    License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+"""
+OpenERP - Server
+OpenERP is an ERP+CRM program for small and medium businesses.
+
+The whole source code is distributed under the terms of the
+GNU Public Licence.
+
+(c) 2003-TODAY, Fabien Pinckaers - OpenERP SA
+"""
+
+import logging
+import os
+import signal
+import sys
+import threading
+import traceback
+import time
+
+import openerp
+
+from . import Command
+
+__author__ = openerp.release.author
+__version__ = openerp.release.version
+
+# Also use the `openerp` logger for the main script.
+_logger = logging.getLogger('openerp')
+
+def dumpstacks(sig, frame):
+    """ Signal handler: dump a stack trace for each existing thread."""
+
+
+"""
+OpenERP - Server
+OpenERP is an ERP+CRM program for small and medium businesses.
+
+The whole source code is distributed under the terms of the
+GNU Public Licence.
+
+(c) 2003-TODAY, Fabien Pinckaers - OpenERP SA
+"""
+
+import logging
+import os
+import signal
+import sys
+import threading
+import traceback
+import time
+
+import openerp
+
+from . import Command
+
+__author__ = openerp.release.author
+__version__ = openerp.release.version
+
+_logger = logging.getLogger('openerp')
+
+def dumpstacks(sig, frame):
+    """ Signal handler: dump a stack trace for each existing thread."""    # code from http://stackoverflow.com/questions/132058/getting-stack-trace-from-a-running-python-application#answer-2569696
+    # modified for python 2.5 compatibility
+    threads_info = dict([(th.ident, {'name': th.name,
+                                    'uid': getattr(th,'uid','n/a')})
+                                for th in threading.enumerate()])
+    code = []
+    for threadId, stack in sys._current_frames().items():
+        thread_info = threads_info.get(threadId)
+        code.append("\n# Thread: %s (id:%s) (uid:%s)" % \
+                    (thread_info and thread_info['name'] or 'n/a',
+                     threadId,
+                     thread_info and thread_info['uid'] or 'n/a'))
+        for filename, lineno, name, line in traceback.extract_stack(stack):
+            code.append('File: "%s", line %d, in %s' % (filename, lineno, name))
+            if line:
+                code.append("  %s" % (line.strip()))
+    _logger.info("\n".join(code))

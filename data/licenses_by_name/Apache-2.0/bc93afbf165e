@@ -1,0 +1,105 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# pylint: disable=invalid-name
+"""measure bandwidth and compute peak"""
+
+import logging
+import tvm
+from . import util
+from .. import rpc
+
+def measure_bandwidth_all_types(total_item, item_per_thread, n_times,
+                                target, target_host, remote, ctx, verbose=True):
+    """ measure memory bandwidth for all types
+
+    Parameters
+    ----------
+    total_item: int
+        number of elements in input array
+    item_per_thread: int
+        number of elements each thread accmulates
+    n_times: int
+        number of runs for averaging
+    target: :any:`tvm.target.Target`
+        the target and option of the compilation.
+    target_host : str or :any:`tvm.target.Target`
+        host compilation target
+    remote: tvm.rpc.RPCSession
+        remote rpc session
+    ctx: TVMcontext
+        the context of array
+    verbose: bool
+        whether outputs immediate result
+
+    Returns
+    -------
+    result: list
+        a list of (type_name, GBPS) pairs
+    """
+
+"""measure bandwidth and compute peak"""
+
+import logging
+import tvm
+from . import util
+from .. import rpc
+
+def measure_bandwidth_all_types(total_item, item_per_thread, n_times,
+                                target, target_host, remote, ctx, verbose=True):
+    """ measure memory bandwidth for all types
+
+    Parameters
+    ----------
+    total_item: int
+        number of elements in input array
+    item_per_thread: int
+        number of elements each thread accmulates
+    n_times: int
+        number of runs for averaging
+    target: :any:`tvm.target.Target`
+        the target and option of the compilation.
+    target_host : str or :any:`tvm.target.Target`
+        host compilation target
+    remote: tvm.rpc.RPCSession
+        remote rpc session
+    ctx: TVMcontext
+        the context of array
+    verbose: bool
+        whether outputs immediate result
+
+    Returns
+    -------
+    result: list
+        a list of (type_name, GBPS) pairs
+    """    max_threads = target.max_num_threads
+
+    result = []
+    for base_type in ["float"]:
+        for bits in [32]:
+            for lanes in [1, 2, 4, 8, 16]:
+                max_speed = -1e9
+                # try different strides
+                for stride in [max_threads, total_item // (lanes * item_per_thread)]:
+                    speed = measure_bandwidth_sum(total_item, item_per_thread, stride,
+                                                  base_type, bits, lanes, target,
+                                                  target_host, remote, ctx, n_times)
+                    max_speed = max(max_speed, speed)
+                type_name = base_type + str(bits)
+                result.append(["%sx%d" % (type_name, lanes), max_speed])
+                if verbose:
+                    logging.info("\t%-10s %.2f GBPS", result[-1][0], result[-1][1])
+    return result

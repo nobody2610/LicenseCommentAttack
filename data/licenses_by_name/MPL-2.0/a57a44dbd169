@@ -1,0 +1,119 @@
+# coding=utf-8
+#
+# This file is part of Hypothesis, which may be found at
+# https://github.com/HypothesisWorks/hypothesis/
+#
+# Most of this work is copyright (C) 2013-2019 David R. MacIver
+# (david@drmaciver.com), but it contains contributions by others. See
+# CONTRIBUTING.rst for a full list of people who may hold copyright, and
+# consult the git log if you need to determine who owns an individual
+# contribution.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public License,
+# v. 2.0. If a copy of the MPL was not distributed with this file, You can
+# obtain one at https://mozilla.org/MPL/2.0/.
+#
+# END HEADER
+
+from __future__ import absolute_import, division, print_function
+
+import gzip
+import json
+import os
+import sys
+import tempfile
+import unicodedata
+
+from hypothesis.configuration import storage_directory, tmpdir
+from hypothesis.errors import InvalidArgument
+from hypothesis.internal.compat import hunichr
+
+if False:
+    from typing import Dict, Tuple
+
+    intervals = Tuple[Tuple[int, int], ...]
+    cache_type = Dict[Tuple[Tuple[str, ...], int, int, intervals], intervals]
+
+
+def charmap():
+    """Return a dict that maps a Unicode category, to a tuple of 2-tuples
+    covering the codepoint intervals for characters in that category.
+
+    >>> charmap()['Co']
+    ((57344, 63743), (983040, 1048573), (1048576, 1114109))
+    """
+
+
+from __future__ import absolute_import, division, print_function
+
+import gzip
+import json
+import os
+import sys
+import tempfile
+import unicodedata
+
+from hypothesis.configuration import storage_directory, tmpdir
+from hypothesis.errors import InvalidArgument
+from hypothesis.internal.compat import hunichr
+
+if False:
+    from typing import Dict, Tuple
+
+    intervals = Tuple[Tuple[int, int], ...]
+    cache_type = Dict[Tuple[Tuple[str, ...], int, int, intervals], intervals]
+
+
+def charmap():
+    """Return a dict that maps a Unicode category, to a tuple of 2-tuples
+    covering the codepoint intervals for characters in that category.
+
+    >>> charmap()['Co']
+    ((57344, 63743), (983040, 1048573), (1048576, 1114109))
+    """    global _charmap
+    # Best-effort caching in the face of missing files and/or unwritable
+    # filesystems is fairly simple: check if loaded, else try loading,
+    # else calculate and try writing the cache.
+    if _charmap is None:
+        f = charmap_file()
+        try:
+            with gzip.GzipFile(f, "rb") as i:
+                tmp_charmap = dict(json.loads(i))
+
+        except Exception:
+            tmp_charmap = {}
+            for i in range(0, sys.maxunicode + 1):
+                cat = unicodedata.category(hunichr(i))
+                rs = tmp_charmap.setdefault(cat, [])
+                if rs and rs[-1][-1] == i - 1:
+                    rs[-1][-1] += 1
+                else:
+                    rs.append([i, i])
+
+            try:
+                # Write the Unicode table atomically
+                fd, tmpfile = tempfile.mkstemp(dir=tmpdir())
+                os.close(fd)
+                # Explicitly set the mtime to get reproducible output
+                with gzip.GzipFile(tmpfile, "wb", mtime=1) as o:
+                    result = json.dumps(sorted(tmp_charmap.items()))
+                    o.write(result.encode())
+
+                os.rename(tmpfile, f)
+            except Exception:
+                pass
+
+        # convert between lists and tuples
+        _charmap = {
+            k: tuple(tuple(pair) for pair in pairs) for k, pairs in tmp_charmap.items()
+        }
+        # each value is a tuple of 2-tuples (that is, tuples of length 2)
+        # and that both elements of that tuple are integers.
+        for vs in _charmap.values():
+            ints = list(sum(vs, ()))
+            assert all([isinstance(x, int) for x in ints])
+            assert ints == sorted(ints)
+            assert all([len(tup) == 2 for tup in vs])
+
+    assert _charmap is not None
+    return _charmap

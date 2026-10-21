@@ -1,0 +1,152 @@
+###############################################################################
+#
+# The MIT License (MIT)
+#
+# Copyright (c) Crossbar.io Technologies GmbH
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+###############################################################################
+
+from __future__ import absolute_import
+
+import binascii
+import hashlib
+import base64
+import struct
+import random
+import os
+import pickle
+import copy
+import json
+import six
+
+from pprint import pformat
+from collections import deque
+
+from autobahn import __version__
+
+from autobahn.websocket.interfaces import IWebSocketChannel, \
+    IWebSocketChannelFrameApi, \
+    IWebSocketChannelStreamingApi
+
+from autobahn.websocket.types import ConnectionRequest, ConnectionResponse, ConnectionDeny
+
+from autobahn.util import Stopwatch, newid, wildcards2patterns, encode_truncate
+from autobahn.util import _LazyHexFormatter
+from autobahn.websocket.utf8validator import Utf8Validator
+from autobahn.websocket.xormasker import XorMaskerNull, create_xor_masker
+from autobahn.websocket.compress import PERMESSAGE_COMPRESSION_EXTENSION
+from autobahn.websocket.util import parse_url
+
+from six.moves import urllib
+import txaio
+
+if six.PY3:
+    # Python 3
+    # noinspection PyShadowingBuiltins
+    xrange = range
+
+__all__ = ("WebSocketProtocol",
+           "WebSocketFactory",
+           "WebSocketServerProtocol",
+           "WebSocketServerFactory",
+           "WebSocketClientProtocol",
+           "WebSocketClientFactory")
+
+
+def _url_to_origin(url):
+    """
+    Given an RFC6455 Origin URL, this returns the (scheme, host, port)
+    triple. If there's no port, and the scheme isn't http or https
+    then port will be None
+    """
+
+
+from __future__ import absolute_import
+
+import binascii
+import hashlib
+import base64
+import struct
+import random
+import os
+import pickle
+import copy
+import json
+import six
+
+from pprint import pformat
+from collections import deque
+
+from autobahn import __version__
+
+from autobahn.websocket.interfaces import IWebSocketChannel, \
+    IWebSocketChannelFrameApi, \
+    IWebSocketChannelStreamingApi
+
+from autobahn.websocket.types import ConnectionRequest, ConnectionResponse, ConnectionDeny
+
+from autobahn.util import Stopwatch, newid, wildcards2patterns, encode_truncate
+from autobahn.util import _LazyHexFormatter
+from autobahn.websocket.utf8validator import Utf8Validator
+from autobahn.websocket.xormasker import XorMaskerNull, create_xor_masker
+from autobahn.websocket.compress import PERMESSAGE_COMPRESSION_EXTENSION
+from autobahn.websocket.util import parse_url
+
+from six.moves import urllib
+import txaio
+
+if six.PY3:
+    xrange = range
+
+__all__ = ("WebSocketProtocol",
+           "WebSocketFactory",
+           "WebSocketServerProtocol",
+           "WebSocketServerFactory",
+           "WebSocketClientProtocol",
+           "WebSocketClientFactory")
+
+
+def _url_to_origin(url):
+    """
+    Given an RFC6455 Origin URL, this returns the (scheme, host, port)
+    triple. If there's no port, and the scheme isn't http or https
+    then port will be None
+    """    if url.lower() == 'null':
+        return 'null'
+
+    res = urllib.parse.urlsplit(url)
+    scheme = res.scheme.lower()
+    if scheme == 'file':
+        # when browsing local files, Chrome sends file:// URLs,
+        # Firefox sends 'null'
+        return 'null'
+
+    host = res.hostname
+    port = res.port
+    if port is None:
+        try:
+            port = {'https': 443, 'http': 80}[scheme]
+        except KeyError:
+            port = None
+
+    if not host:
+        raise ValueError("No host part in Origin '{}'".format(url))
+    return scheme, host, port

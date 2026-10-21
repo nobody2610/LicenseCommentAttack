@@ -1,0 +1,117 @@
+#
+#    This file is part of Scalable COncurrent Operations in Python (SCOOP).
+#
+#    SCOOP is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Lesser General Public License as
+#    published by the Free Software Foundation, either version 3 of
+#    the License, or (at your option) any later version.
+#
+#    SCOOP is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU Lesser General Public License for more details.
+#
+#    You should have received a copy of the GNU Lesser General Public
+#    License along with SCOOP. If not, see <http://www.gnu.org/licenses/>.
+#
+import os
+from inspect import ismethod
+from collections import namedtuple, Iterable
+from functools import partial, reduce
+import itertools
+import copy
+import time
+
+import scoop
+from ._types import Future, CallbackType
+from . import _control as control
+from .fallbacks import (
+    ensureScoopStartedProperlyMapFallback,
+    ensureScoopStartedProperly,
+    NotStartedProperly
+)
+
+
+# Constants stated by PEP 3148 (http://www.python.org/dev/peps/pep-3148/#module-functions)
+FIRST_COMPLETED = 'FIRST_COMPLETED'
+FIRST_EXCEPTION = 'FIRST_EXCEPTION'
+ALL_COMPLETED = 'ALL_COMPLETED'
+_AS_COMPLETED = '_AS_COMPLETED'
+
+# This is the greenlet for running the controller logic.
+_controller = None
+callbackGroupID = itertools.count()
+
+
+def _recursiveReduce(mapFunc, reductionFunc, scan, *iterables):
+    """Generates the recursive reduction tree. Used by mapReduce."""
+
+import os
+from inspect import ismethod
+from collections import namedtuple, Iterable
+from functools import partial, reduce
+import itertools
+import copy
+import time
+
+import scoop
+from ._types import Future, CallbackType
+from . import _control as control
+from .fallbacks import (
+    ensureScoopStartedProperlyMapFallback,
+    ensureScoopStartedProperly,
+    NotStartedProperly
+)
+
+
+FIRST_COMPLETED = 'FIRST_COMPLETED'
+FIRST_EXCEPTION = 'FIRST_EXCEPTION'
+ALL_COMPLETED = 'ALL_COMPLETED'
+_AS_COMPLETED = '_AS_COMPLETED'
+
+_controller = None
+callbackGroupID = itertools.count()
+
+
+def _recursiveReduce(mapFunc, reductionFunc, scan, *iterables):
+    """Generates the recursive reduction tree. Used by mapReduce."""    if iterables:
+        half = min(len(x) // 2 for x in iterables)
+        data_left = [list(x)[:half] for x in iterables]
+        data_right = [list(x)[half:] for x in iterables]
+    else:
+        data_left = data_right = [[]]
+
+    # Submit the left and right parts of the reduction
+    out_futures = [None, None]
+    out_results = [None, None]
+    for index, data in enumerate([data_left, data_right]):
+        if any(len(x) <= 1 for x in data):
+            out_results[index] = mapFunc(*list(zip(*data))[0])
+        else:
+            out_futures[index] = submit(
+                _recursiveReduce,
+                mapFunc,
+                reductionFunc,
+                scan,
+                *data
+            )
+
+    # Wait for the results
+    for index, future in enumerate(out_futures):
+        if future:
+            out_results[index] = future.result()
+
+    # Apply a scan if needed
+    if scan:
+        last_results = copy.copy(out_results)
+        if type(out_results[0]) is not list:
+            out_results[0] = [out_results[0]]
+        else:
+            last_results[0] = out_results[0][-1]
+        if type(out_results[1]) is list:
+            out_results[0].extend(out_results[1][:-1])
+            last_results[1] = out_results[1][-1]
+        out_results[0].append(reductionFunc(*last_results))
+        return out_results[0]
+
+    return reductionFunc(*out_results)

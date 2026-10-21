@@ -1,0 +1,116 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE in the project root
+# for license information.
+
+import argparse
+import os.path
+import sys
+
+from ptvsd._local import debug_main, run_main
+from ptvsd.socket import Address
+from ptvsd.version import __version__, __author__  # noqa
+
+
+##################################
+# the script
+
+"""
+For the PyDevd CLI handling see:
+
+  https://github.com/fabioz/PyDev.Debugger/blob/master/_pydevd_bundle/pydevd_command_line_handling.py
+  https://github.com/fabioz/PyDev.Debugger/blob/master/pydevd.py#L1450  (main func)
+"""  # noqa
+
+PYDEVD_OPTS = {
+    '--file',
+    '--client',
+    #'--port',
+    '--vm_type',
+}
+
+PYDEVD_FLAGS = {
+    '--DEBUG',
+    '--DEBUG_RECORD_SOCKET_READS',
+    '--cmd-line',
+    '--module',
+    '--multiproc',
+    '--multiprocess',
+    '--print-in-debugger-startup',
+    '--save-signatures',
+    '--save-threading',
+    '--save-asyncio',
+    '--server',
+    '--qt-support=auto',
+}
+
+USAGE = """
+  {0} [-h] [-V] [--nodebug] [--host HOST | --server-host HOST] --port PORT -m MODULE [arg ...]
+  {0} [-h] [-V] [--nodebug] [--host HOST | --server-host HOST] --port PORT FILENAME [arg ...]
+"""  # noqa
+
+
+def parse_args(argv=None):
+    """Return the parsed args to use in main()."""
+
+
+import argparse
+import os.path
+import sys
+
+from ptvsd._local import debug_main, run_main
+from ptvsd.socket import Address
+from ptvsd.version import __version__, __author__  # noqa
+
+
+
+"""
+For the PyDevd CLI handling see:
+
+  https://github.com/fabioz/PyDev.Debugger/blob/master/_pydevd_bundle/pydevd_command_line_handling.py
+  https://github.com/fabioz/PyDev.Debugger/blob/master/pydevd.py#L1450  (main func)
+"""  # noqa
+
+PYDEVD_OPTS = {
+    '--file',
+    '--client',
+    '--vm_type',
+}
+
+PYDEVD_FLAGS = {
+    '--DEBUG',
+    '--DEBUG_RECORD_SOCKET_READS',
+    '--cmd-line',
+    '--module',
+    '--multiproc',
+    '--multiprocess',
+    '--print-in-debugger-startup',
+    '--save-signatures',
+    '--save-threading',
+    '--save-asyncio',
+    '--server',
+    '--qt-support=auto',
+}
+
+USAGE = """
+  {0} [-h] [-V] [--nodebug] [--host HOST | --server-host HOST] --port PORT -m MODULE [arg ...]
+  {0} [-h] [-V] [--nodebug] [--host HOST | --server-host HOST] --port PORT FILENAME [arg ...]
+"""  # noqa
+
+
+def parse_args(argv=None):
+    """Return the parsed args to use in main()."""    if argv is None:
+        argv = sys.argv
+        prog = argv[0]
+        if prog == __file__:
+            prog = '{} -m ptvsd'.format(os.path.basename(sys.executable))
+    else:
+        prog = argv[0]
+    argv = argv[1:]
+
+    supported, pydevd, script = _group_args(argv)
+    args = _parse_args(prog, supported)
+    # '--' is used in _run_args to extract pydevd specific args
+    extra = pydevd + ['--']
+    if script:
+        extra += script
+    return args, extra

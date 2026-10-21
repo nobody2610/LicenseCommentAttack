@@ -1,0 +1,110 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2004-2010 Tiny SPRL (<http://tiny.be>).
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as
+#    published by the Free Software Foundation, either version 3 of the
+#    License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+from datetime import datetime, timedelta
+from dateutil import parser
+from dateutil.rrule import *
+from osv import osv, fields
+from tools.translate import _
+import math
+import pooler
+import pytz
+import re
+import tools
+import time
+import logging
+from caldav_node import res_node_calendar
+from orm_utils import get_last_modified
+from tools.safe_eval import safe_eval as eval
+
+try:
+    import vobject
+except ImportError:
+    raise osv.except_osv(_('vobject Import Error!'), _('Please install python-vobject from http://vobject.skyhouseconsulting.com/'))
+
+# O-1  Optional and can come only once
+# O-n  Optional and can come more than once
+# R-1  Required and can come only once
+# R-n  Required and can come more than once
+
+def str2mailto(emailstr, multi=False):
+    """Split one email string to a dict of name, company, mail parts
+
+       @param multi Return an array, recognize comma-sep
+    """
+
+
+from datetime import datetime, timedelta
+from dateutil import parser
+from dateutil.rrule import *
+from osv import osv, fields
+from tools.translate import _
+import math
+import pooler
+import pytz
+import re
+import tools
+import time
+import logging
+from caldav_node import res_node_calendar
+from orm_utils import get_last_modified
+from tools.safe_eval import safe_eval as eval
+
+try:
+    import vobject
+except ImportError:
+    raise osv.except_osv(_('vobject Import Error!'), _('Please install python-vobject from http://vobject.skyhouseconsulting.com/'))
+
+
+def str2mailto(emailstr, multi=False):
+    """Split one email string to a dict of name, company, mail parts
+
+       @param multi Return an array, recognize comma-sep
+    """    # TODO: move to tools or sth.
+    mege = re.compile(r'([^\(\<]+) *(\((.*?)\))? *(\< ?(.*?) ?\>)? ?(\((.*?)\))? *$')
+
+    mailz= [emailstr,]
+    retz = []
+    if multi:
+        mailz = emailstr.split(',')
+
+    for mas in mailz:
+        m = mege.match(mas.strip())
+        if not m:
+            #one of the rare non-matching strings is "sad" :(
+            retz.append({ 'name': mas.strip() })
+            continue
+            # raise ValueError("Invalid email address %r" % mas)
+        rd = {  'name': m.group(1).strip(),
+                'email': m.group(5), }
+        if m.group(2):
+            rd['company'] = m.group(3).strip()
+        elif m.group(6):
+            rd['company'] = m.group(7).strip()
+
+        if rd['name'].startswith('"') and rd['name'].endswith('"'):
+            rd['name'] = rd['name'][1:-1]
+        retz.append(rd)
+
+    if multi:
+        return retz
+    else:
+        return retz[0]

@@ -1,0 +1,107 @@
+# Copyright 2017 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Component builders for non-recurrent networks in DRAGNN."""
+
+
+import tensorflow as tf
+from tensorflow.python.platform import tf_logging as logging
+
+from dragnn.python import component
+from dragnn.python import dragnn_ops
+from dragnn.python import network_units
+from syntaxnet.util import check
+
+
+def fetch_fast_fixed_embeddings(comp,
+                                state,
+                                pad_to_batch=None,
+                                pad_to_steps=None):
+  """Looks up fixed features with fast, non-differentiable, op.
+
+  Since BulkFixedEmbeddings is non-differentiable with respect to the
+  embeddings, the idea is to call this function only when the graph is
+  not being used for training. If the function is being called with fixed step
+  and batch sizes, it will use the most efficient possible extractor.
+
+  Args:
+    comp: Component whose fixed features we wish to look up.
+    state: live MasterState object for the component.
+    pad_to_batch: Optional; the number of batch elements to pad to.
+    pad_to_steps: Optional; the number of steps to pad to.
+
+  Returns:
+    state handle: updated state handle to be used after this call
+    fixed_embeddings: list of NamedTensor objects
+  """
+
+"""Component builders for non-recurrent networks in DRAGNN."""
+
+
+import tensorflow as tf
+from tensorflow.python.platform import tf_logging as logging
+
+from dragnn.python import component
+from dragnn.python import dragnn_ops
+from dragnn.python import network_units
+from syntaxnet.util import check
+
+
+def fetch_fast_fixed_embeddings(comp,
+                                state,
+                                pad_to_batch=None,
+                                pad_to_steps=None):
+  """Looks up fixed features with fast, non-differentiable, op.
+
+  Since BulkFixedEmbeddings is non-differentiable with respect to the
+  embeddings, the idea is to call this function only when the graph is
+  not being used for training. If the function is being called with fixed step
+  and batch sizes, it will use the most efficient possible extractor.
+
+  Args:
+    comp: Component whose fixed features we wish to look up.
+    state: live MasterState object for the component.
+    pad_to_batch: Optional; the number of batch elements to pad to.
+    pad_to_steps: Optional; the number of steps to pad to.
+
+  Returns:
+    state handle: updated state handle to be used after this call
+    fixed_embeddings: list of NamedTensor objects
+  """  _validate_embedded_fixed_features(comp)
+  num_channels = len(comp.spec.fixed_feature)
+  if not num_channels:
+    return state.handle, []
+  tf.logging.info('[%s] Adding %d fast fixed features', comp.name, num_channels)
+
+  features = [
+      comp.get_variable(network_units.fixed_embeddings_name(c))
+      for c in range(num_channels)
+  ]
+
+  if pad_to_batch is not None and pad_to_steps is not None:
+    # If we have fixed padding numbers, we can use 'bulk_embed_fixed_features',
+    # which is the fastest embedding extractor.
+    state.handle, bulk_embeddings, _ = dragnn_ops.bulk_embed_fixed_features(
+        state.handle,
+        features,
+        component=comp.name,
+        pad_to_batch=pad_to_batch,
+        pad_to_steps=pad_to_steps)
+  else:
+    state.handle, bulk_embeddings, _ = dragnn_ops.bulk_fixed_embeddings(
+        state.handle, features, component=comp.name)
+
+  bulk_embeddings = network_units.NamedTensor(
+      bulk_embeddings, 'bulk-%s-fixed-features' % comp.name)
+  return state.handle, [bulk_embeddings]

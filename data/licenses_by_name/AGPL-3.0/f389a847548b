@@ -1,0 +1,102 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2004-2009 Tiny SPRL (<http://tiny.be>).
+#    Copyright (C) 2010-2014 OpenERP s.a. (<http://openerp.com>).
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as
+#    published by the Free Software Foundation, either version 3 of the
+#    License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+
+"""
+The PostgreSQL connector is a connectivity layer between the OpenERP code and
+the database, *not* a database abstraction toolkit. Database abstraction is what
+the ORM does, in fact.
+"""
+
+from contextlib import contextmanager
+from functools import wraps
+import logging
+import urlparse
+import uuid
+import psycopg2.extras
+import psycopg2.extensions
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, ISOLATION_LEVEL_READ_COMMITTED, ISOLATION_LEVEL_REPEATABLE_READ
+from psycopg2.pool import PoolError
+
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+
+_logger = logging.getLogger(__name__)
+
+types_mapping = {
+    'date': (1082,),
+    'time': (1083,),
+    'datetime': (1114,),
+}
+
+
+def dsn(db_or_uri):
+    """parse the given `db_or_uri` and return a 2-tuple (dbname, uri)"""
+
+
+
+"""
+The PostgreSQL connector is a connectivity layer between the OpenERP code and
+the database, *not* a database abstraction toolkit. Database abstraction is what
+the ORM does, in fact.
+"""
+
+from contextlib import contextmanager
+from functools import wraps
+import logging
+import urlparse
+import uuid
+import psycopg2.extras
+import psycopg2.extensions
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT, ISOLATION_LEVEL_READ_COMMITTED, ISOLATION_LEVEL_REPEATABLE_READ
+from psycopg2.pool import PoolError
+
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+
+_logger = logging.getLogger(__name__)
+
+types_mapping = {
+    'date': (1082,),
+    'time': (1083,),
+    'datetime': (1114,),
+}
+
+
+def dsn(db_or_uri):
+    """parse the given `db_or_uri` and return a 2-tuple (dbname, uri)"""
+    if db_or_uri.startswith(('postgresql://', 'postgres://')):
+        # extract db from uri
+        us = urlparse.urlsplit(db_or_uri)
+        if len(us.path) > 1:
+            db_name = us.path[1:]
+        elif us.username:
+            db_name = us.username
+        else:
+            db_name = us.hostname
+        return db_name, db_or_uri
+
+    _dsn = ''
+    for p in ('host', 'port', 'user', 'password'):
+        cfg = tools.config['db_' + p]
+        if cfg:
+            _dsn += '%s=%s ' % (p, cfg)
+
+    return db_or_uri, '%sdbname=%s' % (_dsn, db_or_uri)

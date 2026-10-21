@@ -1,0 +1,282 @@
+# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# =============================================================================
+"""while_v2 and gradient.
+
+This is a version of while_loop that emits a single While op, as well as the
+gradient function for While ops produced by while_loop. This will eventually
+replace the current tf.while_loop implementation once it reaches feature and
+performance parity.
+"""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from tensorflow.core.framework import attr_value_pb2
+from tensorflow.python.framework import constant_op
+from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import func_graph as func_graph_module
+from tensorflow.python.framework import function_def_to_graph
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.framework import tensor_spec
+from tensorflow.python.framework import tensor_util
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import control_flow_ops
+from tensorflow.python.ops import control_flow_util
+from tensorflow.python.ops import control_flow_util_v2 as util
+from tensorflow.python.ops import custom_gradient
+from tensorflow.python.ops import gen_functional_ops
+from tensorflow.python.ops import gradients_impl
+from tensorflow.python.ops import list_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import tensor_array_ops
+from tensorflow.python.util import nest
+
+# pylint: disable=protected-access
+
+# TODO(b/79881896): Handle external control dependencies. tf.while_loop allows
+# control dependencies on external nodes with at least 1 output.
+# Another idea is to create const nodes outside the loop and add control edges
+# to them and then pass those in as data inputs. This should probably be
+# handled in the CapturingGraph itself.
+
+
+def while_loop(cond,
+               body,
+               loop_vars,
+               shape_invariants=None,
+               maximum_iterations=None,
+               name=None,
+               return_same_structure=True):
+  """Like tf.while_loop, except emits a single While op."""
+
+"""while_v2 and gradient.
+
+This is a version of while_loop that emits a single While op, as well as the
+gradient function for While ops produced by while_loop. This will eventually
+replace the current tf.while_loop implementation once it reaches feature and
+performance parity.
+"""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from tensorflow.core.framework import attr_value_pb2
+from tensorflow.python.framework import constant_op
+from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import func_graph as func_graph_module
+from tensorflow.python.framework import function_def_to_graph
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.framework import tensor_spec
+from tensorflow.python.framework import tensor_util
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import control_flow_ops
+from tensorflow.python.ops import control_flow_util
+from tensorflow.python.ops import control_flow_util_v2 as util
+from tensorflow.python.ops import custom_gradient
+from tensorflow.python.ops import gen_functional_ops
+from tensorflow.python.ops import gradients_impl
+from tensorflow.python.ops import list_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import tensor_array_ops
+from tensorflow.python.util import nest
+
+
+
+
+def while_loop(cond,
+               body,
+               loop_vars,
+               shape_invariants=None,
+               maximum_iterations=None,
+               name=None,
+               return_same_structure=True):
+  """Like tf.while_loop, except emits a single While op."""  maximum_iterations = _validate_and_convert_to_tensor(maximum_iterations)
+  # Keep the original loop_vars around to know which args were TensorArrays.
+  orig_loop_vars = loop_vars
+  # Cache its length since we use it at multiple places below.
+  len_orig_loop_vars = len(orig_loop_vars)
+
+  # Convert TensorArrays to their flow variables. These get converted back to
+  # TensorArrays before calling `cond` and `body`. See `wrapped_cond` and
+  # `wrapped_body` below.
+  loop_vars = list(_tensor_array_to_flow(orig_loop_vars))
+  loop_vars = nest.map_structure(
+      ops.internal_convert_to_tensor_or_indexed_slices, loop_vars)
+  if shape_invariants is not None:
+    nest.assert_same_structure(orig_loop_vars, shape_invariants)
+  else:
+    shape_invariants = nest.map_structure(lambda t: t.shape, loop_vars)
+
+  if not name:
+    name = "while"
+
+  with ops.name_scope(name) as scope:
+    with ops.name_scope(None):
+      cond_name = util.unique_fn_name(scope, "cond")
+      body_name = util.unique_fn_name(scope, "body")
+
+    loop_counter = constant_op.constant(
+        0,
+        dtype=maximum_iterations.dtype
+        if maximum_iterations is not None else None,
+        name="loop_counter")
+    # Add loop counter needed for computing gradients.
+    loop_vars = [loop_counter] + loop_vars
+
+    shape_invariants = type(shape_invariants)([tensor_shape.scalar()
+                                              ]) + shape_invariants
+
+    # Automatic control dependencies are added in defuns, but not in v1
+    # graphs. Propagate that behavior here.
+    add_control_dependencies = ops.get_default_graph()._add_control_dependencies
+
+    # Build a `cond` wrapper that can handle the extra counter loop_var.
+    def wrapped_cond(loop_counter, *args):
+      # Convert the flow variables in `args` to TensorArrays. `args` should
+      # already have the same structure as `orig_loop_vars` but currently there
+      # is no nest.zip so we call `_pack_sequence_as` which flattens both
+      # `orig_loop_vars` and `args`, converts flows in `args` to TensorArrays
+      # and packs it into the structure of `orig_loop_vars`.
+      if maximum_iterations is None:
+        return cond(*_pack_sequence_as(orig_loop_vars, args))
+      else:
+        return math_ops.logical_and(
+            loop_counter < maximum_iterations,
+            cond(*_pack_sequence_as(orig_loop_vars, args)))
+
+    cond_graph = func_graph_module.func_graph_from_py_func(
+        cond_name,
+        wrapped_cond,
+        loop_vars, {},
+        signature=_build_signature(loop_vars, shape_invariants),
+        func_graph=util.WhileCondFuncGraph(cond_name),
+        add_control_dependencies=add_control_dependencies)
+
+    # Add external_captures of cond to the list of loop vars.
+    # Note that external tensors will be treated as loop invariants, i.e.,
+    # the value of that tensor in each iteration is the same as it was at the
+    # beginning of the loop execution.
+    loop_vars = loop_vars + cond_graph.external_captures
+    shape_invariants = shape_invariants + type(shape_invariants)(
+        [t.shape for t in cond_graph.external_captures])
+
+    def wrapped_body(loop_counter, *args):
+      """Loop body augmented with counter update.
+
+      Args:
+        loop_counter: Loop counter which needs to be incremented in the body.
+        *args: List of args
+          args[:len_orig_loop_vars] - Args for the original loop body.
+          args[len_orig_loop_vars:] - External captures of cond. These get
+            passed through as is.
+
+      Returns:
+        A list of tensors the same length as args.
+      """
+      # Convert the flow variables in `args` to TensorArrays. `args` should
+      # already have the same structure as `orig_loop_vars` but currently there
+      # is no nest.zip so we call `_pack_sequence_as` which flattens both
+      # `orig_loop_vars` and `args`, converts flows in `args` to TensorArrays
+      # and packs it into the structure of `orig_loop_vars`.
+      outputs = body(
+          *_pack_sequence_as(orig_loop_vars, args[:len_orig_loop_vars]))
+      if not nest.is_sequence(outputs):
+        outputs = [outputs]
+      # Compare the structure of input and output of body converting the
+      # top-level tuples to list to be compatible with legacy while_loop.
+      nest.assert_same_structure(list(outputs), list(orig_loop_vars))
+
+      outputs = _tensor_array_to_flow(outputs)
+
+      # Return the external_captures of cond_graph as is, i.e., treat them as
+      # loop invariants.
+      # TODO(srbs): Update lowering code to create _Enter nodes with
+      # is_constant=True for inputs that are directly passed to outputs.
+      return [loop_counter + 1] + list(outputs) + list(
+          args[len_orig_loop_vars:])
+
+    body_graph = func_graph_module.func_graph_from_py_func(
+        body_name,
+        wrapped_body,
+        loop_vars, {},
+        signature=_build_signature(loop_vars, shape_invariants),
+        func_graph=util.WhileBodyFuncGraph(body_name),
+        add_control_dependencies=add_control_dependencies)
+    # Add external captures of body to the list of loop vars.
+    # Note that external tensors will be treated as loop invariants, i.e.,
+    # the value of that tensor in each iteration is the same as it was at the
+    # beginning of the loop execution.
+    loop_vars = loop_vars + body_graph.external_captures
+    # TODO(srbs): Update lowering code to create _Enter nodes with
+    # is_constant=True for inputs that are directly passed to outputs.
+    body_graph.outputs.extend(body_graph.internal_captures)
+
+    # Capture `external_captures` of `body_graph` in `cond_graph` so that it
+    # expects to receive those as arguments.
+    # TODO(b/118457764): Dedup tensors that are captured in both the cond and
+    # body. This logic already exists in cond_v2.
+    with cond_graph.as_default():
+      for external_capture in body_graph.external_captures:
+        assert external_capture not in cond_graph.captures, (
+            "Looks like both cond and body are capturing the same tensor %s. "
+            "This is not supported yet. For now consider passing,"
+            " this as a loop variable." % str(external_capture))
+        cond_graph.capture(external_capture)
+
+    # Make sure that the shapes of the loop outputs are compatible with the
+    # shape invariants, or the shapes of the loop vars if the invariants are not
+    # specified.
+    num_flattened_outputs = len(nest.flatten(orig_loop_vars))
+    _check_shapes_compat(
+        body_graph.outputs[1:1 + num_flattened_outputs],
+        nest.flatten(shape_invariants[1:1 + len_orig_loop_vars]),
+        nest.flatten(loop_vars[1:1 + len_orig_loop_vars]))
+    flattened_loop_vars = nest.flatten(loop_vars)
+    _check_num_inputs_outputs(cond_graph, body_graph,
+                              len(flattened_loop_vars))
+
+    outputs = gen_functional_ops._while(
+        flattened_loop_vars,
+        util.create_new_tf_function(cond_graph),
+        util.create_new_tf_function(body_graph),
+        output_shapes=[t.shape for t in body_graph.outputs],
+        name=scope)
+
+    _copy_handle_data(body_graph.outputs, outputs)
+    util.maybe_set_lowering_attr(outputs[0].op)
+    _maybe_set_maximum_iterations_attr(outputs[0].op, maximum_iterations)
+
+    # Return identities for each output of the While op, rather than the output
+    # of the While op directly. This makes pruning work if the output of
+    # while_loop() is fetched: the lowering pass converts the While outputs into
+    # IdentityN outputs, which if fetched will cause all ops in the body to be
+    # run (since it takes all exit ops as input). After lowering, each output
+    # identity op will end up with only the appropriate exit op as input.
+    outputs = tuple(array_ops.identity(t) for t in outputs)
+
+  # First var is loop counter.
+  outputs = _pack_sequence_as(orig_loop_vars,
+                              outputs[1:1 + num_flattened_outputs])
+
+  if return_same_structure:
+    return outputs
+
+  flattened_outputs = nest.flatten(outputs)
+  if len(flattened_outputs) == 1:
+    return flattened_outputs[0]
+  else:
+    return outputs

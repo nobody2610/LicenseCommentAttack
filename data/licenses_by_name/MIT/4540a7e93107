@@ -1,0 +1,105 @@
+# -------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for
+# license information.
+# --------------------------------------------------------------------------
+from xml.sax.saxutils import escape as xml_escape
+
+try:
+    from xml.etree import cElementTree as ETree
+except ImportError:
+    from xml.etree import ElementTree as ETree
+from azure.storage.common._common_conversion import (
+    _encode_base64,
+    _str,
+)
+from azure.storage.common._error import (
+    _validate_not_none,
+    _ERROR_START_END_NEEDED_FOR_MD5,
+    _ERROR_RANGE_TOO_LARGE_FOR_MD5,
+)
+from ._error import (
+    _ERROR_PAGE_BLOB_START_ALIGNMENT,
+    _ERROR_PAGE_BLOB_END_ALIGNMENT,
+    _ERROR_INVALID_BLOCK_ID,
+)
+from io import BytesIO
+
+
+def _convert_block_list_to_xml(block_id_list):
+    '''
+    <?xml version="1.0" encoding="utf-8"?>
+    <BlockList>
+      <Committed>first-base64-encoded-block-id</Committed>
+      <Uncommitted>second-base64-encoded-block-id</Uncommitted>
+      <Latest>third-base64-encoded-block-id</Latest>
+    </BlockList>
+
+    Convert a block list to xml to send.
+
+    block_id_list:
+        A list of BlobBlock containing the block ids and block state that are used in put_block_list.
+    Only get block from latest blocks.
+    '''
+
+from xml.sax.saxutils import escape as xml_escape
+
+try:
+    from xml.etree import cElementTree as ETree
+except ImportError:
+    from xml.etree import ElementTree as ETree
+from azure.storage.common._common_conversion import (
+    _encode_base64,
+    _str,
+)
+from azure.storage.common._error import (
+    _validate_not_none,
+    _ERROR_START_END_NEEDED_FOR_MD5,
+    _ERROR_RANGE_TOO_LARGE_FOR_MD5,
+)
+from ._error import (
+    _ERROR_PAGE_BLOB_START_ALIGNMENT,
+    _ERROR_PAGE_BLOB_END_ALIGNMENT,
+    _ERROR_INVALID_BLOCK_ID,
+)
+from io import BytesIO
+
+
+def _convert_block_list_to_xml(block_id_list):
+    '''
+    <?xml version="1.0" encoding="utf-8"?>
+    <BlockList>
+      <Committed>first-base64-encoded-block-id</Committed>
+      <Uncommitted>second-base64-encoded-block-id</Uncommitted>
+      <Latest>third-base64-encoded-block-id</Latest>
+    </BlockList>
+
+    Convert a block list to xml to send.
+
+    block_id_list:
+        A list of BlobBlock containing the block ids and block state that are used in put_block_list.
+    Only get block from latest blocks.
+    '''    if block_id_list is None:
+        return ''
+
+    block_list_element = ETree.Element('BlockList')
+
+    # Enabled
+    for block in block_id_list:
+        if block.id is None:
+            raise ValueError(_ERROR_INVALID_BLOCK_ID)
+        id = xml_escape(_str(format(_encode_base64(block.id))))
+        ETree.SubElement(block_list_element, block.state).text = id
+
+    # Add xml declaration and serialize
+    try:
+        stream = BytesIO()
+        ETree.ElementTree(block_list_element).write(stream, xml_declaration=True, encoding='utf-8', method='xml')
+    except:
+        raise
+    finally:
+        output = stream.getvalue()
+        stream.close()
+
+    # return xml value
+    return output

@@ -1,0 +1,136 @@
+# -*- coding: utf-8 -*-
+
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the (LGPL) GNU Lesser General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Library Lesser General Public License
+# for more details at ( http://www.gnu.org/licenses/lgpl.html ).
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program; if not, write to the Free Software Foundation, Inc.,
+# 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+# written by: Jurko Gospodnetić ( jurko.gospodnetic@pke.hr )
+
+"""
+Suds Python library request construction related unit tests.
+
+Suds provides the user with an option to automatically 'hide' wrapper elements
+around simple types and allow the user to specify such parameters without
+explicitly creating those wrappers. For example: function taking a parameter of
+type X, where X is a sequence containing only a single simple data type (e.g.
+string or integer) will be callable by directly passing it that internal simple
+data type value instead of first wrapping that value in an object of type X and
+then passing that wrapper object instead.
+
+"""
+
+if __name__ == "__main__":
+    from . import __init__
+    __init__.runUsingPyTest(globals())
+
+
+import suds
+import suds.store
+import tests
+
+import pytest
+
+
+# TODO: Update the current restriction type output parameter handling so such
+# parameters get converted to the correct Python data type based on the
+# restriction's underlying data type.
+@pytest.mark.xfail
+def test_twice_wrapped_parameter():
+    """
+      Suds does not recognize 'twice wrapped' data structures and unwraps the
+    external one but keeps the internal wrapping structure in place.
+
+    """
+
+
+
+"""
+Suds Python library request construction related unit tests.
+
+Suds provides the user with an option to automatically 'hide' wrapper elements
+around simple types and allow the user to specify such parameters without
+explicitly creating those wrappers. For example: function taking a parameter of
+type X, where X is a sequence containing only a single simple data type (e.g.
+string or integer) will be callable by directly passing it that internal simple
+data type value instead of first wrapping that value in an object of type X and
+then passing that wrapper object instead.
+
+"""
+
+if __name__ == "__main__":
+    from . import __init__
+    __init__.runUsingPyTest(globals())
+
+
+import suds
+import suds.store
+import tests
+
+import pytest
+
+
+@pytest.mark.xfail
+def test_twice_wrapped_parameter():
+    """
+      Suds does not recognize 'twice wrapped' data structures and unwraps the
+    external one but keeps the internal wrapping structure in place.
+
+    """    client = tests.client_from_wsdl(tests.wsdl_input("""\
+      <xsd:element name="Wrapper1">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="Wrapper2">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="Elemento" type="xsd:string"/>
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>""", "Wrapper1"), nosend=True, prettyxml=True)
+
+    assert _isInputWrapped(client, "f")
+
+    # Web service operation calls made with 'valid' parameters.
+    #
+    # These calls are actually illegal and result in incorrectly generated SOAP
+    # requests not matching the relevant WSDL schema. To make them valid we
+    # would need to pass a more complex value instead of a simple string, but
+    # the current simpler solution is good enough for what we want to test
+    # here.
+    value = "A B C"
+    expectedRequest = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:ns0="my-namespace" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+   <SOAP-ENV:Header/>
+   <ns1:Body>
+      <ns0:Wrapper1>
+         <ns0:Wrapper2>%s</ns0:Wrapper2>
+      </ns0:Wrapper1>
+   </ns1:Body>
+</SOAP-ENV:Envelope>""" % (value,)
+    assert _compare_request(client.service.f(value), expectedRequest)
+    assert _compare_request(client.service.f(Wrapper2=value), expectedRequest)
+
+    # Web service operation calls made with 'invalid' parameters.
+    def testInvalidParameter(**kwargs):
+        assert len(kwargs) == 1
+        element = list(kwargs.keys())[0]
+        expected = "f() got an unexpected keyword argument '%s'" % (element,)
+        e = pytest.raises(TypeError, client.service.f, **kwargs).value
+        try:
+            assert str(e) == expected
+        finally:
+            del e
+    testInvalidParameter(Elemento="A B C")
+    testInvalidParameter(Wrapper1="A B C")

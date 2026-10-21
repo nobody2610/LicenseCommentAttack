@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+
+"""jemdoc version 0.7.3, 2012-11-27."""
+
+# Copyright (C) 2007-2012 Jacob Mattingley (jacobm@stanford.edu).
+#
+# This file is part of jemdoc.
+#
+# jemdoc is free software; you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 3 of the License, or (at your option) any later
+# version.
+#
+# jemdoc is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <http://www.gnu.org/licenses/>.
+#
+# The LaTeX equation portions of this file were initially based on
+# latexmath2png, by Kamil Kisiel (kamil@kamikisiel.net).
+#
+
+from __future__ import print_function
+import sys
+import os
+import re
+import time
+import io
+from subprocess import *
+from types import *
+import tempfile
+
+def hb(f, tag, content1, content2=None, content3=None):
+  """Writes out a halfblock (hb)."""
+
+
+"""jemdoc version 0.7.3, 2012-11-27."""
+
+
+from __future__ import print_function
+import sys
+import os
+import re
+import time
+import io
+from subprocess import *
+from types import *
+import tempfile
+
+def hb(f, tag, content1, content2=None, content3=None):
+  """Writes out a halfblock (hb)."""
+  if content1 is None:
+    content1 = ""
+
+  if content3 is None:
+    content3 = ""
+
+  if content2 is None:
+#    out(f, re.sub(r'\|', content1, tag))
+    r = re.sub(r'\|', content1, tag)
+    r = re.sub(r'\|3', content3, r)
+    r = mathjaxeqresub(r)
+    out(f, r)
+  else:
+    r = re.sub(r'\|1', content1, tag)
+    r = re.sub(r'\|3', content3, r)
+    r = re.sub(r'\|2', content2, r)
+    r = mathjaxeqresub(r)
+    out(f, r)

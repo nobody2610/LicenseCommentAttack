@@ -1,0 +1,71 @@
+# Copyright (C) 2011-2015 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Configure GDB using the ELinOS environment."""
+
+import os
+import glob
+import gdb
+
+
+
+def elinos_init():
+    """Initialize debugger environment for ELinOS.
+
+    Let the debugger know where to find the ELinOS libraries on host. This
+    assumes that an ELinOS environment is properly set up. If some environment
+    variables are missing, warn about which library may be missing.
+    """
+
+
+
+"""Configure GDB using the ELinOS environment."""
+
+import os
+import glob
+import gdb
+
+
+
+def elinos_init():
+    """Initialize debugger environment for ELinOS.
+
+    Let the debugger know where to find the ELinOS libraries on host. This
+    assumes that an ELinOS environment is properly set up. If some environment
+    variables are missing, warn about which library may be missing.
+    """
+    elinos_env = get_elinos_environment()
+
+    solib_dirs = []
+
+    # System libraries
+    if None in (elinos_env[key] for key in ("cdk", "target")):
+        warn("ELinOS system libraries will not be loaded")
+    else:
+        solib_prefix = "%s/%s" % (elinos_env["cdk"], elinos_env["target"])
+        solib_dirs += ["%s/%s" % (solib_prefix, "lib")]
+        gdb.execute("set solib-absolute-prefix %s" % solib_prefix)
+
+    # Xenomai libraries. Those are optional, so have a lighter warning
+    # if they cannot be located.
+    if elinos_env["project"] is None:
+        warn("Xenomai libraries may not be loaded")
+    else:
+        for dir in elinos_env['xenomai']:
+            solib_dirs += ["%s/%s"
+                           % (dir, "xenomai-build/usr/realtime/lib")]
+
+    if len(solib_dirs) != 0:
+        gdb.execute("set solib-search-path %s" % ":".join(solib_dirs))

@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+# Copyright 2017 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""ROUGe metric implementation.
+
+This is a modified and slightly extended verison of
+https://github.com/miso-belica/sumy/blob/dev/sumy/evaluation/rouge.py.
+"""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import itertools
+import numpy as np
+
+#pylint: disable=C0103
+
+
+def rouge_n(evaluated_sentences, reference_sentences, n=2):
+  """
+  Computes ROUGE-N of two text collections of sentences.
+  Sourece: http://research.microsoft.com/en-us/um/people/cyl/download/
+  papers/rouge-working-note-v1.3.1.pdf
+
+  Args:
+    evaluated_sentences: The sentences that have been picked by the summarizer
+    reference_sentences: The sentences from the referene set
+    n: Size of ngram.  Defaults to 2.
+
+  Returns:
+    A tuple (f1, precision, recall) for ROUGE-N
+
+  Raises:
+    ValueError: raises exception if a param has len <= 0
+  """
+
+"""ROUGe metric implementation.
+
+This is a modified and slightly extended verison of
+https://github.com/miso-belica/sumy/blob/dev/sumy/evaluation/rouge.py.
+"""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import itertools
+import numpy as np
+
+
+
+def rouge_n(evaluated_sentences, reference_sentences, n=2):
+  """
+  Computes ROUGE-N of two text collections of sentences.
+  Sourece: http://research.microsoft.com/en-us/um/people/cyl/download/
+  papers/rouge-working-note-v1.3.1.pdf
+
+  Args:
+    evaluated_sentences: The sentences that have been picked by the summarizer
+    reference_sentences: The sentences from the referene set
+    n: Size of ngram.  Defaults to 2.
+
+  Returns:
+    A tuple (f1, precision, recall) for ROUGE-N
+
+  Raises:
+    ValueError: raises exception if a param has len <= 0
+  """  if len(evaluated_sentences) <= 0 or len(reference_sentences) <= 0:
+    raise ValueError("Collections must contain at least 1 sentence.")
+
+  evaluated_ngrams = _get_word_ngrams(n, evaluated_sentences)
+  reference_ngrams = _get_word_ngrams(n, reference_sentences)
+  reference_count = len(reference_ngrams)
+  evaluated_count = len(evaluated_ngrams)
+
+  # Gets the overlapping ngrams between evaluated and reference
+  overlapping_ngrams = evaluated_ngrams.intersection(reference_ngrams)
+  overlapping_count = len(overlapping_ngrams)
+
+  # Handle edge case. This isn't mathematically correct, but it's good enough
+  if evaluated_count == 0:
+    precision = 0.0
+  else:
+    precision = overlapping_count / evaluated_count
+
+  if reference_count == 0:
+    recall = 0.0
+  else:
+    recall = overlapping_count / reference_count
+
+  f1_score = 2.0 * ((precision * recall) / (precision + recall + 1e-8))
+
+  # return overlapping_count / reference_count
+  return f1_score, precision, recall

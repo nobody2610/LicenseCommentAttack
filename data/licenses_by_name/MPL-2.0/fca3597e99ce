@@ -1,0 +1,48 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+import re
+import textwrap
+import string
+from system_header_util import header_path
+
+comment_re = re.compile(r'//[^\n]*\n|/\*.*\*/', re.S)
+decl_re = re.compile(r'''^(.+)\s+        # type
+                         (\w+)\s*        # name
+                         (?:\((.*)\))?$  # optional param tys
+                         ''', re.X | re.S)
+
+
+def read_decls(filename):
+    """Parse & yield C-style decls from an input file"""
+
+
+import re
+import textwrap
+import string
+from system_header_util import header_path
+
+comment_re = re.compile(r'//[^\n]*\n|/\*.*\*/', re.S)
+decl_re = re.compile(r'''^(.+)\s+        # type
+                         (\w+)\s*        # name
+                         (?:\((.*)\))?$  # optional param tys
+                         ''', re.X | re.S)
+
+
+def read_decls(filename):
+    """Parse & yield C-style decls from an input file"""    with open(filename, 'r') as fd:
+        # Strip comments from the source text.
+        text = comment_re.sub('', fd.read())
+
+        # Parse individual declarations.
+        raw_decls = [d.strip() for d in text.split(';') if d.strip()]
+        for raw in raw_decls:
+            match = decl_re.match(raw)
+            if match is None:
+                raise "Invalid decl: %s" % raw
+
+            ty, name, params = match.groups()
+            if params is not None:
+                params = [a.strip() for a in params.split(',') if a.strip()]
+            yield ty, name, params

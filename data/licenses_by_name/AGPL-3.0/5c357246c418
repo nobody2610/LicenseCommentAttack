@@ -1,0 +1,267 @@
+# -*- coding: utf-8 -*-
+##############################################################################
+#
+#    OpenERP, Open Source Management Solution
+#    Copyright (C) 2004-2009 Tiny SPRL (<http://tiny.be>).
+#    Copyright (C) 2010-2014 OpenERP s.a. (<http://openerp.com>).
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as
+#    published by the Free Software Foundation, either version 3 of the
+#    License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the GNU Affero General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+""" Modules (also called addons) management.
+
+"""
+
+import itertools
+import logging
+import os
+import sys
+import threading
+import time
+
+import openerp
+import openerp.modules.db
+import openerp.modules.graph
+import openerp.modules.migration
+import openerp.modules.registry
+import openerp.osv as osv
+import openerp.tools as tools
+from openerp import SUPERUSER_ID
+
+from openerp.tools.translate import _
+from openerp.modules.module import initialize_sys_path, \
+    load_openerp_module, init_module_models, adapt_version
+from module import runs_post_install
+
+_logger = logging.getLogger(__name__)
+_test_logger = logging.getLogger('openerp.tests')
+
+
+def load_module_graph(cr, graph, status=None, perform_checks=True, skip_modules=None, report=None):
+    """Migrates+Updates or Installs all module nodes from ``graph``
+       :param graph: graph of module nodes to load
+       :param status: deprecated parameter, unused, left to avoid changing signature in 8.0
+       :param perform_checks: whether module descriptors should be checked for validity (prints warnings
+                              for same cases)
+       :param skip_modules: optional list of module names (packages) which have previously been loaded and can be skipped
+       :return: list of modules that were installed or updated
+    """
+
+
+""" Modules (also called addons) management.
+
+"""
+
+import itertools
+import logging
+import os
+import sys
+import threading
+import time
+
+import openerp
+import openerp.modules.db
+import openerp.modules.graph
+import openerp.modules.migration
+import openerp.modules.registry
+import openerp.osv as osv
+import openerp.tools as tools
+from openerp import SUPERUSER_ID
+
+from openerp.tools.translate import _
+from openerp.modules.module import initialize_sys_path, \
+    load_openerp_module, init_module_models, adapt_version
+from module import runs_post_install
+
+_logger = logging.getLogger(__name__)
+_test_logger = logging.getLogger('openerp.tests')
+
+
+def load_module_graph(cr, graph, status=None, perform_checks=True, skip_modules=None, report=None):
+    """Migrates+Updates or Installs all module nodes from ``graph``
+       :param graph: graph of module nodes to load
+       :param status: deprecated parameter, unused, left to avoid changing signature in 8.0
+       :param perform_checks: whether module descriptors should be checked for validity (prints warnings
+                              for same cases)
+       :param skip_modules: optional list of module names (packages) which have previously been loaded and can be skipped
+       :return: list of modules that were installed or updated
+    """    def load_test(module_name, idref, mode):
+        cr.commit()
+        try:
+            _load_data(cr, module_name, idref, mode, 'test')
+            return True
+        except Exception:
+            _test_logger.exception(
+                'module %s: an exception occurred in a test', module_name)
+            return False
+        finally:
+            if tools.config.options['test_commit']:
+                cr.commit()
+            else:
+                cr.rollback()
+                # avoid keeping stale xml_id, etc. in cache 
+                openerp.modules.registry.RegistryManager.clear_caches(cr.dbname)
+
+
+    def _get_files_of_kind(kind):
+        if kind == 'demo':
+            kind = ['demo_xml', 'demo']
+        elif kind == 'data':
+            kind = ['init_xml', 'update_xml', 'data']
+        if isinstance(kind, str):
+            kind = [kind]
+        files = []
+        for k in kind:
+            for f in package.data[k]:
+                files.append(f)
+                if k.endswith('_xml') and not (k == 'init_xml' and not f.endswith('.xml')):
+                    # init_xml, update_xml and demo_xml are deprecated except
+                    # for the case of init_xml with yaml, csv and sql files as
+                    # we can't specify noupdate for those file.
+                    correct_key = 'demo' if k.count('demo') else 'data'
+                    _logger.warning(
+                        "module %s: key '%s' is deprecated in favor of '%s' for file '%s'.",
+                        package.name, k, correct_key, f
+                    )
+        return files
+
+    def _load_data(cr, module_name, idref, mode, kind):
+        """
+
+        kind: data, demo, test, init_xml, update_xml, demo_xml.
+
+        noupdate is False, unless it is demo data or it is csv data in
+        init mode.
+
+        """
+        try:
+            if kind in ('demo', 'test'):
+                threading.currentThread().testing = True
+            for filename in _get_files_of_kind(kind):
+                _logger.info("loading %s/%s", module_name, filename)
+                noupdate = False
+                if kind in ('demo', 'demo_xml') or (filename.endswith('.csv') and kind in ('init', 'init_xml')):
+                    noupdate = True
+                tools.convert_file(cr, module_name, filename, idref, mode, noupdate, kind, report)
+        finally:
+            if kind in ('demo', 'test'):
+                threading.currentThread().testing = False
+
+    processed_modules = []
+    loaded_modules = []
+    registry = openerp.registry(cr.dbname)
+    migrations = openerp.modules.migration.MigrationManager(cr, graph)
+    _logger.info('loading %d modules...', len(graph))
+
+    registry.clear_manual_fields()
+
+    # register, instantiate and initialize models for each modules
+    t0 = time.time()
+    t0_sql = openerp.sql_db.sql_counter
+
+    for index, package in enumerate(graph):
+        module_name = package.name
+        module_id = package.id
+
+        if skip_modules and module_name in skip_modules:
+            continue
+
+        migrations.migrate_module(package, 'pre')
+        load_openerp_module(package.name)
+
+        new_install = package.state == 'to install'
+        if new_install:
+            py_module = sys.modules['openerp.addons.%s' % (module_name,)]
+            pre_init = package.info.get('pre_init_hook')
+            if pre_init:
+                getattr(py_module, pre_init)(cr)
+
+        models = registry.load(cr, package)
+
+        loaded_modules.append(package.name)
+        if hasattr(package, 'init') or hasattr(package, 'update') or package.state in ('to install', 'to upgrade'):
+            registry.setup_models(cr, partial=True)
+            init_module_models(cr, package.name, models)
+
+        idref = {}
+
+        mode = 'update'
+        if hasattr(package, 'init') or package.state == 'to install':
+            mode = 'init'
+
+        if hasattr(package, 'init') or hasattr(package, 'update') or package.state in ('to install', 'to upgrade'):
+            # Can't put this line out of the loop: ir.module.module will be
+            # registered by init_module_models() above.
+            modobj = registry['ir.module.module']
+
+            if perform_checks:
+                modobj.check(cr, SUPERUSER_ID, [module_id])
+
+            if package.state=='to upgrade':
+                # upgrading the module information
+                modobj.write(cr, SUPERUSER_ID, [module_id], modobj.get_values_from_terp(package.data))
+            _load_data(cr, module_name, idref, mode, kind='data')
+            has_demo = hasattr(package, 'demo') or (package.dbdemo and package.state != 'installed')
+            if has_demo:
+                _load_data(cr, module_name, idref, mode, kind='demo')
+                cr.execute('update ir_module_module set demo=%s where id=%s', (True, module_id))
+                modobj.invalidate_cache(cr, SUPERUSER_ID, ['demo'], [module_id])
+
+            migrations.migrate_module(package, 'post')
+
+            if new_install:
+                post_init = package.info.get('post_init_hook')
+                if post_init:
+                    getattr(py_module, post_init)(cr, registry)
+
+            registry._init_modules.add(package.name)
+            # validate all the views at a whole
+            registry['ir.ui.view']._validate_module_views(cr, SUPERUSER_ID, module_name)
+
+            if has_demo:
+                # launch tests only in demo mode, allowing tests to use demo data.
+                if tools.config.options['test_enable']:
+                    # Yamel test
+                    report.record_result(load_test(module_name, idref, mode))
+                    # Python tests
+                    ir_http = registry['ir.http']
+                    if hasattr(ir_http, '_routing_map'):
+                        # Force routing map to be rebuilt between each module test suite
+                        del(ir_http._routing_map)
+                    report.record_result(openerp.modules.module.run_unit_tests(module_name, cr.dbname))
+
+            processed_modules.append(package.name)
+
+            ver = adapt_version(package.data['version'])
+            # Set new modules and dependencies
+            modobj.write(cr, SUPERUSER_ID, [module_id], {'state': 'installed', 'latest_version': ver})
+            # Update translations for all installed languages
+            modobj.update_translations(cr, SUPERUSER_ID, [module_id], None, {'overwrite': openerp.tools.config["overwrite_existing_translations"]})
+
+            package.state = 'installed'
+            for kind in ('init', 'demo', 'update'):
+                if hasattr(package, kind):
+                    delattr(package, kind)
+
+        registry._init_modules.add(package.name)
+        cr.commit()
+
+    _logger.log(25, "%s modules loaded in %.2fs, %s queries", len(graph), time.time() - t0, openerp.sql_db.sql_counter - t0_sql)
+
+    registry.clear_manual_fields()
+
+    cr.commit()
+
+    return loaded_modules, processed_modules
